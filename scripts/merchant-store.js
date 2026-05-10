@@ -322,10 +322,32 @@ export function formatCopper(cp) {
   return parts.length > 0 ? parts.join(" ") : "—";
 }
 
+// PF2E system bundles real coin icons — use them so the prices match the
+// character sheet's currency row.
+const COIN_IMGS = {
+  pp: "systems/pf2e/icons/equipment/treasure/currency/platinum-pieces.webp",
+  gp: "systems/pf2e/icons/equipment/treasure/currency/gold-pieces.webp",
+  sp: "systems/pf2e/icons/equipment/treasure/currency/silver-pieces.webp",
+  cp: "systems/pf2e/icons/equipment/treasure/currency/copper-pieces.webp",
+};
+const COIN_LABEL_KEYS = {
+  pp: "PF2E_CINEMATIC_MERCHANT.coin.pp",
+  gp: "PF2E_CINEMATIC_MERCHANT.coin.gp",
+  sp: "PF2E_CINEMATIC_MERCHANT.coin.sp",
+  cp: "PF2E_CINEMATIC_MERCHANT.coin.cp",
+};
+
+function coinLabel(denom) {
+  const key = COIN_LABEL_KEYS[denom];
+  if (!key) return denom;
+  const v = game?.i18n?.localize?.(key);
+  return v && !v.startsWith("PF2E_CINEMATIC_MERCHANT.") ? v : denom.toUpperCase();
+}
+
 /**
- * Same as formatCopper but returns HTML with a coin disc icon next to
- * each denomination — used everywhere the merchant UI renders prices.
- * Falls back to a single em-dash for zero/null.
+ * Same as formatCopper but returns HTML with the PF2E coin sprite next
+ * to each denomination — used everywhere the merchant UI renders prices.
+ * Hovering a chip shows the localized currency name.
  */
 export function formatCopperHtml(cp) {
   if (cp == null || cp <= 0) {
@@ -335,9 +357,12 @@ export function formatCopperHtml(cp) {
   const parts = [];
   for (const [denom, n] of Object.entries(coins)) {
     if (n > 0) {
+      const src = COIN_IMGS[denom];
+      const label = coinLabel(denom);
       parts.push(
-        `<span class="pf2e-cd-mer-coin pf2e-cd-mer-coin-${denom}">` +
-        `<i class="pf2e-cd-mer-coin-disc" aria-hidden="true"></i>${n}` +
+        `<span class="pf2e-cd-mer-coin pf2e-cd-mer-coin-${denom}" title="${label}">` +
+        `<img class="pf2e-cd-mer-coin-img" src="${src}" alt="${denom}" draggable="false" />` +
+        `<span class="pf2e-cd-mer-coin-amount">${n}</span>` +
         `</span>`
       );
     }
