@@ -184,6 +184,13 @@ class RandomStockDialog {
     this.refs.runBtn.disabled = true;
     const origLabel = this.refs.runBtn.querySelector(".label").textContent;
     this.refs.runBtn.querySelector(".label").textContent = t("PF2E_CINEMATIC_MERCHANT.random.generating");
+    // Hide this dialog (and the merchant frame behind it) so PF2E system
+    // sub-dialogs raised during item creation — e.g. ammunition / damage
+    // type pickers — aren't trapped behind our z-index stack.
+    if (this.root) this.root.style.visibility = "hidden";
+    const merchantRoot = document.getElementById("pf2e-cd-mer-root");
+    const prevMerchantVis = merchantRoot?.style.visibility;
+    if (merchantRoot) merchantRoot.style.visibility = "hidden";
 
     try {
       // Pick N items (with replacement allowed; PF2E often has duplicate flavor stock)
@@ -256,6 +263,10 @@ class RandomStockDialog {
       ui.notifications?.error(t("PF2E_CINEMATIC_MERCHANT.random.failed"));
     } finally {
       this._busy = false;
+      // Restore the merchant frame visibility (we don't necessarily own it).
+      if (merchantRoot) merchantRoot.style.visibility = prevMerchantVis ?? "";
+      // Restore our own modal in case we didn't close (error path).
+      if (this.root) this.root.style.visibility = "";
       if (this.refs?.runBtn) {
         this.refs.runBtn.disabled = false;
         const lbl = this.refs.runBtn.querySelector(".label");

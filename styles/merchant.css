@@ -2424,6 +2424,44 @@
   box-shadow: 0 0 0 2px rgba(94, 0, 0, 0.15);
 }
 
+/* Force the qty dialog on top of every merchant modal (sell-list/cart at
+   ~10010). Also style the confirm button so it actually looks like a
+   merchant "Buy" instead of the default Foundry tan. */
+.pf2e-cd-mer-qty-dialog,
+dialog.pf2e-cd-mer-qty-dialog,
+.application.pf2e-cd-mer-qty-dialog {
+  z-index: 10050 !important;
+}
+.pf2e-cd-mer-qty-dialog button[data-action="ok"],
+.pf2e-cd-mer-qty-dialog footer button.default,
+.pf2e-cd-mer-qty-dialog .dialog-buttons button.default,
+.pf2e-cd-mer-qty-dialog button[type="submit"] {
+  font-family: "Eczar", Georgia, serif !important;
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 2px;
+  text-transform: uppercase;
+  background: linear-gradient(180deg, #6b0a0a 0%, #5e0000 50%, #4a0000 100%) !important;
+  border: 1px solid #5e0000 !important;
+  color: #fff8e8 !important;
+  text-shadow: 0 1px 1px rgba(0, 0, 0, 0.4);
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.25);
+  border-radius: 3px;
+}
+.pf2e-cd-mer-qty-dialog button[data-action="ok"]:hover,
+.pf2e-cd-mer-qty-dialog footer button.default:hover,
+.pf2e-cd-mer-qty-dialog .dialog-buttons button.default:hover,
+.pf2e-cd-mer-qty-dialog button[type="submit"]:hover {
+  background: linear-gradient(180deg, #8b1010 0%, #780a0a 50%, #5e0000 100%) !important;
+  border-color: #b8923a !important;
+  box-shadow: 0 0 14px rgba(94, 0, 0, 0.5), 0 4px 12px rgba(0, 0, 0, 0.3);
+}
+.pf2e-cd-mer-qty-dialog button[data-action="ok"] i,
+.pf2e-cd-mer-qty-dialog footer button.default i,
+.pf2e-cd-mer-qty-dialog .dialog-buttons button.default i {
+  color: #ffd76b;
+}
+
 /* === After-sale confirmation toast (custom popup, not Foundry's notif) === */
 .pf2e-cd-mer-toast {
   position: fixed;
