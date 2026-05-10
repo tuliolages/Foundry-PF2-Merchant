@@ -577,7 +577,7 @@ export class MerchantWindow {
           <p class="pf2e-cd-mer-info">${game.i18n.localize("PF2E_CINEMATIC_MERCHANT.window.editQtyHint")}</p>
         </form>
       `,
-      classes: ["pf2e-cd-mer-dialog"],
+      classes: ["pf2e-cd-mer-dialog", "pf2e-cd-mer-qty-dialog"],
       ok: {
         label: game.i18n.localize("PF2E_CINEMATIC_MERCHANT.window.savePrice"),
         icon: "fa-solid fa-save",

@@ -2424,6 +2424,42 @@
   box-shadow: 0 0 0 2px rgba(94, 0, 0, 0.15);
 }
 
+/* GM Set-quantity dialog (uses the .pf2e-cd-mer-qty-form wrapper) — same
+   parchment-input treatment as the buy popup so the number is readable. */
+.pf2e-cd-mer-qty-form {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  font-family: "Eczar", Georgia, serif;
+}
+.pf2e-cd-mer-qty-form label {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 2px;
+  color: var(--pf2e-mer-red);
+}
+.pf2e-cd-mer-qty-form input[type=number] {
+  width: 100%;
+  padding: 10px 14px;
+  font-family: Georgia, serif;
+  font-size: 22px;
+  font-weight: 700;
+  text-align: center;
+  color: var(--pf2e-mer-text, #1a0e05);
+  background: #fff8e8;
+  border: 1px solid var(--pf2e-mer-gold);
+  border-radius: 3px;
+}
+.pf2e-cd-mer-qty-form input[type=number]:focus {
+  outline: none;
+  border-color: var(--pf2e-mer-red);
+  box-shadow: 0 0 0 2px rgba(94, 0, 0, 0.15);
+}
+
 /* Force the qty dialog on top of every merchant modal (sell-list/cart at
    ~10010). Also style the confirm button so it actually looks like a
    merchant "Buy" instead of the default Foundry tan. */
