@@ -2,7 +2,7 @@
 // that lets the player review, edit qty, and check out atomically.
 
 import {
-  MODULE_ID, effectiveItemPriceCp, formatCopper, priceToCopper, copperToCoins,
+  MODULE_ID, effectiveItemPriceCp, formatCopper, formatCopperHtml, priceToCopper, copperToCoins,
 } from "./merchant-store.js";
 
 let _activeDrawer = null;
@@ -169,7 +169,7 @@ class CartDrawer {
     list.innerHTML = lines.map(l => this._row(l)).join("");
     totalEl.innerHTML = `
       <span class="pf2e-cd-mer-cart-total-label">${escapeHTML(game.i18n.localize("PF2E_CINEMATIC_MERCHANT.cart.total"))}</span>
-      <span class="pf2e-cd-mer-cart-total-value">${escapeHTML(formatCopper(total))}</span>
+      <span class="pf2e-cd-mer-cart-total-value">${formatCopperHtml(total)}</span>
     `;
 
     // Affordability check — disable checkout if viewer can't pay
@@ -219,14 +219,14 @@ class CartDrawer {
         <img class="pf2e-cd-mer-cart-row-img" src="${escapeHTML(item.img ?? "icons/svg/item-bag.svg")}" alt="" />
         <div class="pf2e-cd-mer-cart-row-info">
           <div class="pf2e-cd-mer-cart-row-name">${escapeHTML(item.name)}</div>
-          <div class="pf2e-cd-mer-cart-row-unit">${escapeHTML(formatCopper(unitCp))} ${escapeHTML(game.i18n.localize("PF2E_CINEMATIC_MERCHANT.cart.each"))}</div>
+          <div class="pf2e-cd-mer-cart-row-unit">${formatCopperHtml(unitCp)} ${escapeHTML(game.i18n.localize("PF2E_CINEMATIC_MERCHANT.cart.each"))}</div>
         </div>
         <div class="pf2e-cd-mer-cart-row-qty">
           <button type="button" data-action="line-minus" data-item-id="${item.id}">−</button>
           <span>${qty}</span>
           <button type="button" data-action="line-plus" data-item-id="${item.id}" ${qty >= stockQty ? "disabled" : ""}>+</button>
         </div>
-        <div class="pf2e-cd-mer-cart-row-line">${escapeHTML(formatCopper(lineCp))}</div>
+        <div class="pf2e-cd-mer-cart-row-line">${formatCopperHtml(lineCp)}</div>
         <button type="button" class="pf2e-cd-mer-cart-row-remove" data-action="line-remove" data-item-id="${item.id}" title="${escapeHTML(game.i18n.localize("PF2E_CINEMATIC_MERCHANT.cart.removeItem"))}">
           <i class="fa-solid fa-xmark"></i>
         </button>

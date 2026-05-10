@@ -1,6 +1,6 @@
 // Custom item details modal — PF2E parchment styling, key stats, description, buy button.
 
-import { MODULE_ID, effectiveItemPriceCp, formatCopper } from "./merchant-store.js";
+import { MODULE_ID, effectiveItemPriceCp, formatCopper, formatCopperHtml } from "./merchant-store.js";
 
 const RARITY_LABELS = { common: "common", uncommon: "uncommon", rare: "rare", unique: "unique" };
 
@@ -199,7 +199,7 @@ class ItemDetailsModal {
     const buyBtn = this.canBuy
       ? `<button type="button" class="pf2e-cd-mer-detail-buy" data-action="buy">
            <i class="fa-solid fa-coins"></i>
-           <span>${escapeHTML(t("PF2E_CINEMATIC_MERCHANT.detail.buyFor"))} ${formatCopper(cp)}</span>
+           <span>${escapeHTML(t("PF2E_CINEMATIC_MERCHANT.detail.buyFor"))} ${formatCopperHtml(cp)}</span>
          </button>`
       : "";
 
@@ -219,7 +219,7 @@ class ItemDetailsModal {
               <span class="meta-tag meta-level">${escapeHTML(t("PF2E_CINEMATIC_MERCHANT.detail.level"))} ${lvl}</span>
               ${qty > 1 ? `<span class="meta-tag meta-qty">×${qty}</span>` : ""}
             </div>
-            <div class="pf2e-cd-mer-detail-price">${formatCopper(cp)}</div>
+            <div class="pf2e-cd-mer-detail-price">${formatCopperHtml(cp)}</div>
           </div>
         </div>
         ${stats}

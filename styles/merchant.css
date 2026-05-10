@@ -21,6 +21,59 @@
   --pf2e-mer-shadow:     0 4px 12px rgba(0, 0, 0, 0.4), 0 0 0 1px rgba(0, 0, 0, 0.15);
 }
 
+/* === Inline coin chips (pp / gp / sp / cp) — used everywhere a price is
+       rendered. Sized to sit alongside body text without overflowing rows. */
+.pf2e-cd-mer-coin {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  margin-right: 5px;
+  font-family: Georgia, "Times New Roman", serif;
+  font-weight: 700;
+  white-space: nowrap;
+  line-height: 1;
+}
+.pf2e-cd-mer-coin:last-child { margin-right: 0; }
+.pf2e-cd-mer-coin-disc {
+  display: inline-block;
+  width: 1em;
+  height: 1em;
+  border-radius: 50%;
+  flex: 0 0 auto;
+  border: 1px solid rgba(0, 0, 0, 0.45);
+  box-shadow: inset 0 1px 1px rgba(255, 255, 255, 0.45),
+              inset 0 -1px 2px rgba(0, 0, 0, 0.3),
+              0 1px 1px rgba(0, 0, 0, 0.18);
+  position: relative;
+}
+.pf2e-cd-mer-coin-disc::after {
+  content: "";
+  position: absolute;
+  inset: 18%;
+  border-radius: 50%;
+  border: 1px solid rgba(0, 0, 0, 0.18);
+}
+.pf2e-cd-mer-coin-pp .pf2e-cd-mer-coin-disc {
+  background: radial-gradient(circle at 32% 30%, #f6f6ff 0%, #d6d6e8 45%, #8c8ca8 100%);
+  border-color: rgba(80, 80, 110, 0.7);
+}
+.pf2e-cd-mer-coin-gp .pf2e-cd-mer-coin-disc {
+  background: radial-gradient(circle at 32% 30%, #fff6c8 0%, #f0c845 45%, #9c7220 100%);
+  border-color: rgba(90, 65, 15, 0.7);
+}
+.pf2e-cd-mer-coin-sp .pf2e-cd-mer-coin-disc {
+  background: radial-gradient(circle at 32% 30%, #f6f6f6 0%, #d0d0d0 45%, #828282 100%);
+  border-color: rgba(70, 70, 70, 0.7);
+}
+.pf2e-cd-mer-coin-cp .pf2e-cd-mer-coin-disc {
+  background: radial-gradient(circle at 32% 30%, #f4c098 0%, #c8773e 45%, #6b3814 100%);
+  border-color: rgba(70, 30, 10, 0.7);
+}
+.pf2e-cd-mer-coin-empty {
+  font-family: "Eczar", Georgia, serif;
+  opacity: 0.55;
+}
+
 /* === Root overlay === */
 #pf2e-cd-mer-root {
   position: fixed;
