@@ -2653,6 +2653,84 @@ dialog.pf2e-cd-mer-qty-dialog,
   color: rgba(120, 90, 40, 0.45);
 }
 
+/* === Services category tile === */
+.pf2e-cd-mer-cat-services {
+  border-color: var(--pf2e-mer-gold-light, #b8923a) !important;
+  background:
+    radial-gradient(ellipse at 50% 30%, var(--pf2e-mer-parchment, #fff5d8) 0%, var(--pf2e-mer-cream-warm, #f4ecd8) 100%) !important;
+}
+.pf2e-cd-mer-cat-services .pf2e-cd-mer-cat-icon { color: var(--pf2e-mer-red, #5e0000) !important; }
+.pf2e-cd-mer-cat-services .pf2e-cd-mer-cat-count { background: var(--pf2e-mer-red, #5e0000) !important; }
+.pf2e-cd-mer-cat-services.is-empty { opacity: 0.6; filter: grayscale(0.3); }
+
+/* Service row (item row + description line) */
+.pf2e-cd-mer-service-row { align-items: flex-start !important; }
+.pf2e-cd-mer-service-row .pf2e-cd-mer-item-img { margin-top: 2px; }
+.pf2e-cd-mer-service-desc {
+  margin-top: 6px;
+  padding-right: 4px;
+  font-size: 12px;
+  line-height: 1.4;
+  color: rgba(50, 25, 10, 0.85);
+  font-style: italic;
+  white-space: pre-wrap;
+}
+
+/* GM "Add service" button at the top of the services list */
+.pf2e-cd-mer-service-add {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  width: 100%;
+  margin-bottom: 6px;
+  padding: 10px 14px;
+  font-family: "Eczar", "EB Garamond", Georgia, serif;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 2px;
+  text-transform: uppercase;
+  color: var(--pf2e-mer-cream-warm, #f4ecd8);
+  background: linear-gradient(180deg, #5a4818 0%, var(--pf2e-mer-gold, #785a28) 100%);
+  border: 1px solid var(--pf2e-mer-gold-light, #b8923a);
+  border-radius: 3px;
+  cursor: pointer;
+  transition: background 140ms, transform 140ms;
+}
+.pf2e-cd-mer-service-add:hover {
+  background: linear-gradient(180deg, #7a6428 0%, #9c7a32 100%);
+  transform: translateY(-1px);
+}
+
+/* Service editor dialog */
+.pf2e-cd-mer-service-form { display: flex; flex-direction: column; gap: 10px; font-family: "Eczar", Georgia, serif; }
+.pf2e-cd-mer-service-form label {
+  display: flex; flex-direction: column; gap: 4px;
+  font-size: 11px; font-weight: 700; letter-spacing: 1.5px; text-transform: uppercase;
+  color: var(--pf2e-mer-red, #5e0000);
+}
+.pf2e-cd-mer-service-form input,
+.pf2e-cd-mer-service-form textarea,
+.pf2e-cd-mer-service-form select {
+  font-family: "Eczar", Georgia, serif;
+  font-size: 13px; padding: 6px 10px;
+  border: 1px solid var(--pf2e-mer-gold, #785a28); border-radius: 3px;
+  background: #fff8e8; color: var(--pf2e-mer-text, #1a0e05);
+  text-transform: none; letter-spacing: 0; font-weight: 400;
+}
+.pf2e-cd-mer-service-form textarea { resize: vertical; min-height: 60px; }
+.pf2e-cd-mer-service-form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.pf2e-cd-mer-service-form fieldset {
+  border: 1px solid var(--pf2e-mer-gold, #785a28); border-radius: 3px; padding: 8px 10px;
+}
+.pf2e-cd-mer-service-form fieldset legend {
+  padding: 0 6px; font-size: 11px; font-weight: 700; letter-spacing: 1.5px;
+  text-transform: uppercase; color: var(--pf2e-mer-red, #5e0000);
+}
+.pf2e-cd-mer-service-coin-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; }
+.pf2e-cd-mer-service-coin-grid label { align-items: center; text-align: center; }
+.pf2e-cd-mer-service-coin-grid input { width: 100%; text-align: center; font-size: 15px; font-weight: 700; font-family: Georgia, serif; }
+
 /* Wishlist tile in the category grid */
 .pf2e-cd-mer-cat-wishlist {
   border-color: var(--pf2e-mer-gold-light, #b8923a) !important;

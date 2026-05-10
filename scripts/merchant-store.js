@@ -192,6 +192,58 @@ export function isCoinItem(item) {
   return false;
 }
 
+// --- Merchant services (Pathfinder dienstleistungen — bath, lodging,
+//     hireling, spellcasting, repair, ...). Stored as a flag on the
+//     merchant actor: an array of { id, name, description, priceCp,
+//     level, rarity, img } entries. ---
+
+const SERVICES_FLAG = "services";
+
+/** Read all services on a merchant. Always returns an array. */
+export function getMerchantServices(actor) {
+  if (!actor) return [];
+  const v = actor.flags?.[MODULE_ID]?.[SERVICES_FLAG];
+  return Array.isArray(v) ? [...v] : [];
+}
+
+async function writeMerchantServices(actor, list) {
+  if (!actor) return;
+  return actor.update({ [`flags.${MODULE_ID}.${SERVICES_FLAG}`]: list });
+}
+
+/** Insert a new service. Auto-assigns an id if none given. */
+export async function addMerchantService(actor, service) {
+  if (!actor || !service) return;
+  const list = getMerchantServices(actor);
+  const s = {
+    id: service.id ?? foundry.utils.randomID(),
+    name: String(service.name ?? "Service"),
+    description: String(service.description ?? ""),
+    priceCp: Math.max(0, Math.floor(Number(service.priceCp ?? 0)) || 0),
+    level: Math.max(0, Math.floor(Number(service.level ?? 0)) || 0),
+    rarity: ["common","uncommon","rare","unique"].includes(service.rarity) ? service.rarity : "common",
+    img: String(service.img ?? "icons/svg/book.svg"),
+  };
+  list.push(s);
+  await writeMerchantServices(actor, list);
+  return s;
+}
+
+export async function updateMerchantService(actor, id, patch) {
+  if (!actor || !id) return;
+  const list = getMerchantServices(actor);
+  const idx = list.findIndex(s => s.id === id);
+  if (idx < 0) return;
+  list[idx] = { ...list[idx], ...patch, id };
+  await writeMerchantServices(actor, list);
+}
+
+export async function removeMerchantService(actor, id) {
+  if (!actor || !id) return;
+  const list = getMerchantServices(actor).filter(s => s.id !== id);
+  await writeMerchantServices(actor, list);
+}
+
 // --- Merchant ownership ---
 
 /**

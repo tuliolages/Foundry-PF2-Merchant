@@ -19,6 +19,10 @@ import {
   getItemPriceOverrideCp,
   isCoinItem,
   normalizeMerchantType,
+  getMerchantServices,
+  addMerchantService,
+  updateMerchantService,
+  removeMerchantService,
 } from "./merchant-store.js";
 import { openCompendiumPicker } from "./compendium-picker.js";
 import { openItemDetails } from "./item-details.js";
@@ -429,6 +433,17 @@ export class MerchantWindow {
     if (editQtyBtn) { e.stopPropagation(); this._handleEditQty(editQtyBtn.dataset.itemId); return; }
     const delBtn  = e.target.closest("[data-action=delete]");
     if (delBtn)  { e.stopPropagation(); this._handleDelete(delBtn.dataset.itemId); return; }
+    // Service handlers
+    const svcBuy = e.target.closest("[data-action=service-buy]");
+    if (svcBuy) { e.stopPropagation(); this._handleBuyService(svcBuy.dataset.serviceId); return; }
+    const svcAdd = e.target.closest("[data-action=service-add]");
+    if (svcAdd) { e.stopPropagation(); this._handleServiceEdit(null); return; }
+    const svcEdit = e.target.closest("[data-action=service-edit]");
+    if (svcEdit) { e.stopPropagation(); this._handleServiceEdit(svcEdit.dataset.serviceId); return; }
+    const svcDel = e.target.closest("[data-action=service-delete]");
+    if (svcDel) { e.stopPropagation(); this._handleServiceDelete(svcDel.dataset.serviceId); return; }
+    // Don't open item-details for service rows
+    if (e.target.closest(".pf2e-cd-mer-service-row")) return;
     const row = e.target.closest(".pf2e-cd-mer-item");
     if (row) this._handleShowDetails(row.dataset.itemId);
   }
@@ -807,9 +822,187 @@ export class MerchantWindow {
     }
     if (this.viewMode === "categories") {
       this._renderCategoryGrid();
+    } else if (this.viewMode === "services") {
+      this._renderServiceList();
     } else {
       this._renderItemList();
     }
+  }
+
+  _renderServiceList() {
+    this.refs.backBar.hidden = false;
+    this.refs.filtersBar.hidden = true;
+    if (this.refs.sellBar) this.refs.sellBar.hidden = !this.viewer;
+    if (this.refs.compareBar) this.refs.compareBar.hidden = true;
+    this.refs.currentCat.textContent = game.i18n.localize("PF2E_CINEMATIC_MERCHANT.cat.services");
+
+    const services = getMerchantServices(this.actor);
+    if (services.length === 0 && !game.user.isGM) {
+      this.refs.itemList.innerHTML = "";
+      this.refs.empty.hidden = false;
+      return;
+    }
+    this.refs.empty.hidden = true;
+
+    const gmAddRow = game.user.isGM ? `
+      <button type="button" class="pf2e-cd-mer-service-add" data-action="service-add">
+        <i class="fa-solid fa-circle-plus"></i>
+        <span>${escapeHTML(game.i18n.localize("PF2E_CINEMATIC_MERCHANT.service.add"))}</span>
+      </button>` : "";
+
+    const rows = services.map(s => this._renderServiceRow(s)).join("");
+    this.refs.itemList.innerHTML = gmAddRow + rows;
+  }
+
+  _renderServiceRow(s) {
+    const canBuy = !!this.viewer;
+    const buyDisabled = canBuy ? "" : "disabled";
+    const rarity = s.rarity ?? "common";
+    const gmButtons = game.user.isGM ? `
+      <button type="button" class="pf2e-cd-mer-edit-price" data-action="service-edit" data-service-id="${s.id}" title="${escapeHTML(game.i18n.localize("PF2E_CINEMATIC_MERCHANT.service.edit"))}"><i class="fa-solid fa-pen"></i></button>
+      <button type="button" class="pf2e-cd-mer-delete" data-action="service-delete" data-service-id="${s.id}" title="${escapeHTML(game.i18n.localize("PF2E_CINEMATIC_MERCHANT.service.delete"))}"><i class="fa-solid fa-xmark"></i></button>
+    ` : "";
+    return `
+      <div class="pf2e-cd-mer-item pf2e-cd-mer-service-row rarity-${rarity}" data-service-id="${s.id}">
+        <img class="pf2e-cd-mer-item-img" src="${escapeHTML(s.img ?? "icons/svg/book.svg")}" alt="" />
+        <div class="pf2e-cd-mer-item-main">
+          <div class="pf2e-cd-mer-item-line1">
+            <span class="pf2e-cd-mer-item-name">${escapeHTML(s.name)}</span>
+            <span class="pf2e-cd-mer-item-price">${escapeHTML(formatCopper(s.priceCp))}</span>
+          </div>
+          <div class="pf2e-cd-mer-item-line2">
+            <span class="pf2e-cd-mer-item-tag pf2e-cd-mer-tag-cat">${escapeHTML(game.i18n.localize("PF2E_CINEMATIC_MERCHANT.cat.services"))}</span>
+            <span class="pf2e-cd-mer-item-tag pf2e-cd-mer-tag-rarity rarity-${rarity}">${escapeHTML(localizeRarity(rarity))}</span>
+            ${s.level > 0 ? `<span class="pf2e-cd-mer-item-tag pf2e-cd-mer-tag-level">L ${s.level}</span>` : ""}
+          </div>
+          ${s.description ? `<div class="pf2e-cd-mer-service-desc">${escapeHTML(s.description)}</div>` : ""}
+        </div>
+        <div class="pf2e-cd-mer-item-actions">
+          ${gmButtons}
+          <button type="button" class="pf2e-cd-mer-buy" data-action="service-buy" data-service-id="${s.id}" ${buyDisabled}>
+            <i class="fa-solid fa-handshake"></i> ${game.i18n.localize("PF2E_CINEMATIC_MERCHANT.service.pay")}
+          </button>
+        </div>
+      </div>
+    `;
+  }
+
+  async _handleBuyService(serviceId) {
+    if (!this.viewer || !this.actor) return;
+    const services = getMerchantServices(this.actor);
+    const s = services.find(x => x.id === serviceId);
+    if (!s) return;
+    const priceCp = Math.max(0, Number(s.priceCp ?? 0) || 0);
+    if (priceCp > 0) {
+      const buyerCp = priceToCopper({ value: readActorCoins(this.viewer) });
+      if (buyerCp < priceCp) {
+        ui.notifications?.warn(game.i18n.localize("PF2E_CINEMATIC_MERCHANT.warn.notEnoughGold"));
+        return;
+      }
+    }
+    try {
+      if (priceCp > 0) {
+        await deductCoins(this.viewer, priceCp);
+        await addCoins(this.actor, priceCp);
+      }
+      this._logTransaction("buy", s.name, 1, priceCp);
+      playBuy();
+      this._showTransactionPopup({
+        kind: "buy", name: s.name, img: s.img, qty: 1, price: formatCopper(priceCp),
+      });
+      ChatMessage.create({
+        speaker: ChatMessage.getSpeaker({ actor: this.viewer }),
+        content: `<div class="pf2e-cd-mer-chat-buy"><strong>${escapeHTML(this.viewer.name)}</strong> ${game.i18n.localize("PF2E_CINEMATIC_MERCHANT.service.paidFor")} <strong>${escapeHTML(s.name)}</strong> ${game.i18n.localize("PF2E_CINEMATIC_MERCHANT.chat.from")} <em>${escapeHTML(this.actor.name)}</em>${priceCp > 0 ? ` ${game.i18n.localize("PF2E_CINEMATIC_MERCHANT.chat.for")} ${escapeHTML(formatCopper(priceCp))}` : ""}.${s.description ? `<div class="pf2e-cd-mer-chat-flavor">${escapeHTML(s.description)}</div>` : ""}</div>`,
+      });
+    } catch (err) {
+      console.warn(`${MODULE_ID} | service purchase failed:`, err);
+      ui.notifications?.error(game.i18n.localize("PF2E_CINEMATIC_MERCHANT.warn.buyFailed"));
+    }
+  }
+
+  async _handleServiceEdit(serviceId) {
+    if (!game.user.isGM || !this.actor) return;
+    const services = getMerchantServices(this.actor);
+    const existing = serviceId ? services.find(s => s.id === serviceId) : null;
+    const coins = copperToCoins(existing?.priceCp ?? 0);
+    const DialogV2 = foundry.applications?.api?.DialogV2;
+    if (!DialogV2) return;
+    const titleKey = existing
+      ? "PF2E_CINEMATIC_MERCHANT.service.editTitle"
+      : "PF2E_CINEMATIC_MERCHANT.service.addTitle";
+    await DialogV2.prompt({
+      window: { title: game.i18n.localize(titleKey) },
+      content: `
+        <form class="pf2e-cd-mer-service-form">
+          <label>${game.i18n.localize("PF2E_CINEMATIC_MERCHANT.service.field.name")}
+            <input type="text" name="svc-name" value="${escapeHTML(existing?.name ?? "")}" autofocus />
+          </label>
+          <label>${game.i18n.localize("PF2E_CINEMATIC_MERCHANT.service.field.description")}
+            <textarea name="svc-desc" rows="3" placeholder="${escapeHTML(game.i18n.localize("PF2E_CINEMATIC_MERCHANT.service.field.descriptionPlaceholder"))}">${escapeHTML(existing?.description ?? "")}</textarea>
+          </label>
+          <div class="pf2e-cd-mer-service-form-row">
+            <label>${game.i18n.localize("PF2E_CINEMATIC_MERCHANT.detail.level")}
+              <input type="number" name="svc-level" min="0" max="25" value="${existing?.level ?? 0}" />
+            </label>
+            <label>${game.i18n.localize("PF2E_CINEMATIC_MERCHANT.compare.rarity")}
+              <select name="svc-rarity">
+                ${["common","uncommon","rare","unique"].map(r => `<option value="${r}"${(existing?.rarity ?? "common") === r ? " selected" : ""}>${escapeHTML(localizeRarity(r))}</option>`).join("")}
+              </select>
+            </label>
+          </div>
+          <fieldset>
+            <legend>${game.i18n.localize("PF2E_CINEMATIC_MERCHANT.service.field.price")}</legend>
+            <div class="pf2e-cd-mer-service-coin-grid">
+              <label><span>pp</span><input type="number" name="svc-pp" min="0" value="${coins.pp}" /></label>
+              <label><span>gp</span><input type="number" name="svc-gp" min="0" value="${coins.gp}" /></label>
+              <label><span>sp</span><input type="number" name="svc-sp" min="0" value="${coins.sp}" /></label>
+              <label><span>cp</span><input type="number" name="svc-cp" min="0" value="${coins.cp}" /></label>
+            </div>
+          </fieldset>
+          <label>${game.i18n.localize("PF2E_CINEMATIC_MERCHANT.service.field.img")}
+            <input type="text" name="svc-img" value="${escapeHTML(existing?.img ?? "icons/svg/book.svg")}" />
+          </label>
+        </form>
+      `,
+      classes: ["pf2e-cd-mer-dialog", "pf2e-cd-mer-service-dialog"],
+      ok: {
+        label: game.i18n.localize("PF2E_CINEMATIC_MERCHANT.settings.save"),
+        icon: "fa-solid fa-save",
+        callback: async (event, button, dialog) => {
+          const root = dialog?.element instanceof HTMLElement ? dialog.element : dialog?.element?.[0];
+          const name = String(root?.querySelector("[name=svc-name]")?.value ?? "").trim() || "Service";
+          const desc = String(root?.querySelector("[name=svc-desc]")?.value ?? "");
+          const level = Number(root?.querySelector("[name=svc-level]")?.value ?? 0);
+          const rarity = String(root?.querySelector("[name=svc-rarity]")?.value ?? "common");
+          const img = String(root?.querySelector("[name=svc-img]")?.value ?? "").trim() || "icons/svg/book.svg";
+          const pp = Number(root?.querySelector("[name=svc-pp]")?.value ?? 0);
+          const gp = Number(root?.querySelector("[name=svc-gp]")?.value ?? 0);
+          const sp = Number(root?.querySelector("[name=svc-sp]")?.value ?? 0);
+          const cp = Number(root?.querySelector("[name=svc-cp]")?.value ?? 0);
+          const priceCp = pp * 1000 + gp * 100 + sp * 10 + cp;
+          if (existing) {
+            await updateMerchantService(this.actor, existing.id, { name, description: desc, priceCp, level, rarity, img });
+          } else {
+            await addMerchantService(this.actor, { name, description: desc, priceCp, level, rarity, img });
+          }
+          this._renderItems();
+        },
+      },
+    });
+  }
+
+  async _handleServiceDelete(serviceId) {
+    if (!game.user.isGM || !this.actor) return;
+    const services = getMerchantServices(this.actor);
+    const s = services.find(x => x.id === serviceId);
+    if (!s) return;
+    const ok = await confirmDialog(
+      game.i18n.localize("PF2E_CINEMATIC_MERCHANT.service.delete"),
+      game.i18n.format("PF2E_CINEMATIC_MERCHANT.service.confirmDelete", { name: s.name })
+    );
+    if (!ok) return;
+    await removeMerchantService(this.actor, serviceId);
+    this._renderItems();
   }
 
   _renderCategoryGrid() {
@@ -836,6 +1029,19 @@ export class MerchantWindow {
       tiles.push({ value: c.value, label: game.i18n.localize(c.labelKey), icon: c.icon, count: n });
     }
 
+    // Services tile (visible whenever the merchant has services configured,
+    // or always for the GM so they can add the first one).
+    const services = getMerchantServices(this.actor);
+    let servicesTile = "";
+    if (services.length > 0 || game.user.isGM) {
+      servicesTile = `
+        <button type="button" class="pf2e-cd-mer-cat-tile pf2e-cd-mer-cat-services ${services.length === 0 ? "is-empty" : ""}" data-cat="__services">
+          <i class="fa-solid fa-handshake-angle pf2e-cd-mer-cat-icon"></i>
+          <span class="pf2e-cd-mer-cat-label">${escapeHTML(game.i18n.localize("PF2E_CINEMATIC_MERCHANT.cat.services"))}</span>
+          <span class="pf2e-cd-mer-cat-count">${services.length}</span>
+        </button>`;
+    }
+
     // Wishlist tile (player-only) — counts items at this merchant that the
     // player has bookmarked. Clicking it filters to wishlist-only.
     let wishlistTile = "";
@@ -860,6 +1066,7 @@ export class MerchantWindow {
             <span class="pf2e-cd-mer-cat-count">${t.count}</span>
           </button>
         `).join("")}
+        ${servicesTile}
         ${wishlistTile}
       </div>
     `;
@@ -874,6 +1081,10 @@ export class MerchantWindow {
       this.filters.category = "all";
       this.filters.wishlistOnly = true;
       if (this.refs.wishlistCb) this.refs.wishlistCb.checked = true;
+    } else if (cat === "__services") {
+      this.viewMode = "services";
+      this._renderItems();
+      return;
     } else {
       this.filters.category = cat;
       this.filters.wishlistOnly = false;
