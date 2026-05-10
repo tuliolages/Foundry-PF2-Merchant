@@ -64,6 +64,9 @@
   "PF2E_CINEMATIC_MERCHANT.service.field.descriptionPlaceholder": "What does the merchant offer? E.g. \"A hot bath in a private room.\"",
   "PF2E_CINEMATIC_MERCHANT.service.field.price": "Price",
   "PF2E_CINEMATIC_MERCHANT.service.field.img": "Icon path",
+  "PF2E_CINEMATIC_MERCHANT.service.field.preset": "Preset (Pathfinder 2e SRD)",
+  "PF2E_CINEMATIC_MERCHANT.service.preset.custom": "— Custom (fill in below) —",
+  "PF2E_CINEMATIC_MERCHANT.service.preset.uncategorized": "Other",
 
   "PF2E_CINEMATIC_MERCHANT.rarity.all": "Any rarity",
   "PF2E_CINEMATIC_MERCHANT.rarity.common": "Common",

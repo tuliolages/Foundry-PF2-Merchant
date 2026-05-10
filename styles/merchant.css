@@ -2471,7 +2471,11 @@ dialog.pf2e-cd-mer-qty-dialog,
 .pf2e-cd-mer-qty-dialog button[data-action="ok"],
 .pf2e-cd-mer-qty-dialog footer button.default,
 .pf2e-cd-mer-qty-dialog .dialog-buttons button.default,
-.pf2e-cd-mer-qty-dialog button[type="submit"] {
+.pf2e-cd-mer-qty-dialog button[type="submit"],
+.pf2e-cd-mer-service-dialog button[data-action="ok"],
+.pf2e-cd-mer-service-dialog footer button.default,
+.pf2e-cd-mer-service-dialog .dialog-buttons button.default,
+.pf2e-cd-mer-service-dialog button[type="submit"] {
   font-family: "Eczar", Georgia, serif !important;
   font-size: 13px;
   font-weight: 700;
@@ -2487,14 +2491,21 @@ dialog.pf2e-cd-mer-qty-dialog,
 .pf2e-cd-mer-qty-dialog button[data-action="ok"]:hover,
 .pf2e-cd-mer-qty-dialog footer button.default:hover,
 .pf2e-cd-mer-qty-dialog .dialog-buttons button.default:hover,
-.pf2e-cd-mer-qty-dialog button[type="submit"]:hover {
+.pf2e-cd-mer-qty-dialog button[type="submit"]:hover,
+.pf2e-cd-mer-service-dialog button[data-action="ok"]:hover,
+.pf2e-cd-mer-service-dialog footer button.default:hover,
+.pf2e-cd-mer-service-dialog .dialog-buttons button.default:hover,
+.pf2e-cd-mer-service-dialog button[type="submit"]:hover {
   background: linear-gradient(180deg, #8b1010 0%, #780a0a 50%, #5e0000 100%) !important;
   border-color: #b8923a !important;
   box-shadow: 0 0 14px rgba(94, 0, 0, 0.5), 0 4px 12px rgba(0, 0, 0, 0.3);
 }
 .pf2e-cd-mer-qty-dialog button[data-action="ok"] i,
 .pf2e-cd-mer-qty-dialog footer button.default i,
-.pf2e-cd-mer-qty-dialog .dialog-buttons button.default i {
+.pf2e-cd-mer-qty-dialog .dialog-buttons button.default i,
+.pf2e-cd-mer-service-dialog button[data-action="ok"] i,
+.pf2e-cd-mer-service-dialog footer button.default i,
+.pf2e-cd-mer-service-dialog .dialog-buttons button.default i {
   color: #ffd76b;
 }
 
@@ -2711,12 +2722,42 @@ dialog.pf2e-cd-mer-qty-dialog,
 }
 .pf2e-cd-mer-service-form input,
 .pf2e-cd-mer-service-form textarea,
-.pf2e-cd-mer-service-form select {
-  font-family: "Eczar", Georgia, serif;
-  font-size: 13px; padding: 6px 10px;
-  border: 1px solid var(--pf2e-mer-gold, #785a28); border-radius: 3px;
-  background: #fff8e8; color: var(--pf2e-mer-text, #1a0e05);
-  text-transform: none; letter-spacing: 0; font-weight: 400;
+.pf2e-cd-mer-service-form select,
+.pf2e-cd-mer-service-dialog input,
+.pf2e-cd-mer-service-dialog textarea,
+.pf2e-cd-mer-service-dialog select {
+  font-family: "Eczar", Georgia, serif !important;
+  font-size: 13px !important;
+  padding: 6px 10px !important;
+  border: 1px solid var(--pf2e-mer-gold, #785a28) !important;
+  border-radius: 3px !important;
+  background: #fff8e8 !important;
+  color: var(--pf2e-mer-text, #1a0e05) !important;
+  text-transform: none !important;
+  letter-spacing: 0 !important;
+  font-weight: 400 !important;
+  box-shadow: inset 0 1px 2px rgba(120, 90, 40, 0.12) !important;
+}
+.pf2e-cd-mer-service-form input:focus,
+.pf2e-cd-mer-service-form textarea:focus,
+.pf2e-cd-mer-service-form select:focus,
+.pf2e-cd-mer-service-dialog input:focus,
+.pf2e-cd-mer-service-dialog textarea:focus,
+.pf2e-cd-mer-service-dialog select:focus {
+  outline: none !important;
+  border-color: var(--pf2e-mer-red, #5e0000) !important;
+  box-shadow: 0 0 0 2px rgba(94, 0, 0, 0.18), inset 0 1px 2px rgba(120, 90, 40, 0.12) !important;
+}
+.pf2e-cd-mer-service-form select option,
+.pf2e-cd-mer-service-dialog select option {
+  background: #fff8e8 !important;
+  color: var(--pf2e-mer-text, #1a0e05) !important;
+}
+.pf2e-cd-mer-service-form textarea::placeholder,
+.pf2e-cd-mer-service-form input::placeholder,
+.pf2e-cd-mer-service-dialog textarea::placeholder,
+.pf2e-cd-mer-service-dialog input::placeholder {
+  color: rgba(50, 25, 10, 0.45) !important;
 }
 .pf2e-cd-mer-service-form textarea { resize: vertical; min-height: 60px; }
 .pf2e-cd-mer-service-form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }

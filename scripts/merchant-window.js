@@ -25,6 +25,7 @@ import {
   removeMerchantService,
 } from "./merchant-store.js";
 import { openCompendiumPicker } from "./compendium-picker.js";
+import { SERVICE_PRESETS } from "./service-presets.js";
 import { openItemDetails } from "./item-details.js";
 import { openSellList } from "./sell-list.js";
 import { openCompareModal } from "./compare-modal.js";
@@ -930,10 +931,38 @@ export class MerchantWindow {
     const titleKey = existing
       ? "PF2E_CINEMATIC_MERCHANT.service.editTitle"
       : "PF2E_CINEMATIC_MERCHANT.service.addTitle";
+
+    // Group presets by subcategory for an organized <optgroup> dropdown.
+    const presetGroups = {};
+    for (const p of SERVICE_PRESETS) {
+      const sc = p.subcategory || game.i18n.localize("PF2E_CINEMATIC_MERCHANT.service.preset.uncategorized");
+      (presetGroups[sc] ??= []).push(p);
+    }
+    const presetOptions = existing ? "" : Object.entries(presetGroups)
+      .sort(([a], [b]) => a.localeCompare(b))
+      .map(([sc, list]) => {
+        const opts = list.map((p, idx) => {
+          const i = SERVICE_PRESETS.indexOf(p);
+          const priceTag = p.priceRaw ? ` — ${p.priceRaw}` : "";
+          return `<option value="${i}">${escapeHTML(p.name)}${escapeHTML(priceTag)}</option>`;
+        }).join("");
+        return `<optgroup label="${escapeHTML(sc)}">${opts}</optgroup>`;
+      }).join("");
+
+    const presetSelect = existing ? "" : `
+      <label>${game.i18n.localize("PF2E_CINEMATIC_MERCHANT.service.field.preset")}
+        <select name="svc-preset">
+          <option value="">${escapeHTML(game.i18n.localize("PF2E_CINEMATIC_MERCHANT.service.preset.custom"))}</option>
+          ${presetOptions}
+        </select>
+      </label>
+    `;
+
     await DialogV2.prompt({
       window: { title: game.i18n.localize(titleKey) },
       content: `
         <form class="pf2e-cd-mer-service-form">
+          ${presetSelect}
           <label>${game.i18n.localize("PF2E_CINEMATIC_MERCHANT.service.field.name")}
             <input type="text" name="svc-name" value="${escapeHTML(existing?.name ?? "")}" autofocus />
           </label>
@@ -965,6 +994,26 @@ export class MerchantWindow {
         </form>
       `,
       classes: ["pf2e-cd-mer-dialog", "pf2e-cd-mer-service-dialog"],
+      render: (event, dialog) => {
+        const root = dialog?.element instanceof HTMLElement ? dialog.element : dialog?.element?.[0];
+        const sel = root?.querySelector("[name=svc-preset]");
+        if (!sel) return;
+        sel.addEventListener("change", () => {
+          const idx = Number(sel.value);
+          if (!Number.isFinite(idx) || idx < 0 || idx >= SERVICE_PRESETS.length) return;
+          const p = SERVICE_PRESETS[idx];
+          const coins = copperToCoins(p.priceCp ?? 0);
+          const set = (n, v) => { const el = root.querySelector(`[name=${n}]`); if (el) el.value = String(v); };
+          set("svc-name", p.name);
+          set("svc-desc", p.description ?? "");
+          set("svc-level", p.level ?? 0);
+          set("svc-rarity", p.rarity ?? "common");
+          set("svc-pp", coins.pp);
+          set("svc-gp", coins.gp);
+          set("svc-sp", coins.sp);
+          set("svc-cp", coins.cp);
+        });
+      },
       ok: {
         label: game.i18n.localize("PF2E_CINEMATIC_MERCHANT.settings.save"),
         icon: "fa-solid fa-save",

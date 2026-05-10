@@ -64,6 +64,9 @@
   "PF2E_CINEMATIC_MERCHANT.service.field.descriptionPlaceholder": "Was bietet der Händler an? Z.B. »Ein heißes Bad in einem Privatraum.«",
   "PF2E_CINEMATIC_MERCHANT.service.field.price": "Preis",
   "PF2E_CINEMATIC_MERCHANT.service.field.img": "Icon-Pfad",
+  "PF2E_CINEMATIC_MERCHANT.service.field.preset": "Vorlage (Pathfinder 2e SRD)",
+  "PF2E_CINEMATIC_MERCHANT.service.preset.custom": "— Eigener Dienst (Felder unten ausfüllen) —",
+  "PF2E_CINEMATIC_MERCHANT.service.preset.uncategorized": "Sonstige",
 
   "PF2E_CINEMATIC_MERCHANT.rarity.all": "Beliebige Seltenheit",
   "PF2E_CINEMATIC_MERCHANT.rarity.common": "Allgemein",
