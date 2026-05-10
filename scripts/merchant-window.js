@@ -44,17 +44,9 @@ const CATEGORIES = [
   { value: "kit",        labelKey: "PF2E_CINEMATIC_MERCHANT.cat.kit",        icon: "fa-toolbox" },
 ];
 
-// Ammunition is sometimes stored as `consumable` with system.category="ammo"
-// in PF2E. Treat those rows as ammunition everywhere we group/filter by type.
-function effectiveItemType(it) {
-  const t = it?.type;
-  if (t === "consumable") {
-    const cat = it.system?.category;
-    const consType = it.system?.consumableType?.value ?? it.system?.consumableType;
-    if (cat === "ammo" || cat === "ammunition" || consType === "ammo") return "ammunition";
-  }
-  return t;
-}
+// Use the shared normalizer — also matches stackGroup + traits + name
+// heuristics so arrows/bolts/etc. land in the ammunition bucket.
+const effectiveItemType = normalizeMerchantType;
 
 function localizeRarity(rarity) {
   const v = game.i18n.localize(`PF2E_CINEMATIC_MERCHANT.rarity.${rarity}`);
