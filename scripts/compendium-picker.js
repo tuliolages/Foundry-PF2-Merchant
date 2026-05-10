@@ -102,9 +102,8 @@ class CompendiumPicker {
     for (const pack of itemPacks) {
       try {
         const idx = await pack.getIndex({ fields: [
-          "system.price", "system.level.value", "system.traits.rarity",
-          "system.traits.value", "system.category", "system.consumableType",
-          "system.consumableType.value", "system.stackGroup",
+          "system.price", "system.level", "system.traits",
+          "system.category", "system.consumableType", "system.stackGroup",
           "type", "img",
         ]});
         const list = [...idx]

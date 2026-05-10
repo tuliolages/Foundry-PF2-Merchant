@@ -89,9 +89,8 @@ class RandomStockDialog {
     for (const pack of packs) {
       try {
         const idx = await pack.getIndex({ fields: [
-          "system.level.value", "system.traits.rarity", "system.traits.value",
-          "system.category", "system.consumableType", "system.consumableType.value",
-          "system.stackGroup", "type",
+          "system.level", "system.traits", "system.category",
+          "system.consumableType", "system.stackGroup", "type",
         ] });
         for (const it of idx) {
           const normType = normalizeItemType(it);
