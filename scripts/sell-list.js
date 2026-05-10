@@ -131,7 +131,11 @@ class SellListModal {
       });
     }
     for (const input of this.refs.list.querySelectorAll("[data-role=qty-input]")) {
-      input.addEventListener("change", () => this._sanitizeQty(input));
+      input.addEventListener("input", () => this._updateLinePrice(input.dataset.itemId));
+      input.addEventListener("change", () => {
+        this._sanitizeQty(input);
+        this._updateLinePrice(input.dataset.itemId);
+      });
       input.addEventListener("click", (e) => e.stopPropagation());
     }
     for (const btn of this.refs.list.querySelectorAll("[data-action=sell]")) {
@@ -178,6 +182,15 @@ class SellListModal {
     let v = Math.floor(Number(input.value)) || 1;
     v = Math.max(1, Math.min(max, v + delta));
     input.value = String(v);
+    this._updateLinePrice(itemId);
+  }
+
+  _updateLinePrice(itemId) {
+    const priceEl = this.refs.list.querySelector(`[data-role=sell-price][data-item-id="${itemId}"]`);
+    if (!priceEl) return;
+    const unitCp = Number(priceEl.dataset.unitCp) || 0;
+    const qty = this._readQty(itemId);
+    priceEl.textContent = formatCopper(unitCp * qty);
   }
 
   _collectSellableItems() {
@@ -218,7 +231,7 @@ class SellListModal {
             ${qty > 1 ? `<span class="tag tag-qty">×${qty}</span>` : ""}
           </div>
         </div>
-        <div class="pf2e-cd-mer-sell-row-price">${formatCopper(sellCp)}</div>
+        <div class="pf2e-cd-mer-sell-row-price" data-role="sell-price" data-item-id="${item.id}" data-unit-cp="${sellCp}">${formatCopper(sellCp)}</div>
         ${qtySelector}
         <button type="button" class="pf2e-cd-mer-sell-row-btn" data-action="sell" data-item-id="${item.id}">
           <i class="fa-solid fa-coins"></i>
