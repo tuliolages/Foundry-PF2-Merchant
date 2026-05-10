@@ -323,29 +323,6 @@ export function formatCopper(cp) {
 }
 
 /**
- * Same as formatCopper but returns HTML with a coin disc icon next to
- * each denomination — used everywhere the merchant UI renders prices.
- * Falls back to a single em-dash for zero/null.
- */
-export function formatCopperHtml(cp) {
-  if (cp == null || cp <= 0) {
-    return `<span class="pf2e-cd-mer-coin pf2e-cd-mer-coin-empty">—</span>`;
-  }
-  const coins = copperToCoins(cp);
-  const parts = [];
-  for (const [denom, n] of Object.entries(coins)) {
-    if (n > 0) {
-      parts.push(
-        `<span class="pf2e-cd-mer-coin pf2e-cd-mer-coin-${denom}">` +
-        `<i class="pf2e-cd-mer-coin-disc" aria-hidden="true"></i>${n}` +
-        `</span>`
-      );
-    }
-  }
-  return parts.length ? parts.join("") : `<span class="pf2e-cd-mer-coin pf2e-cd-mer-coin-empty">—</span>`;
-}
-
-/**
  * Effective per-item BUY price in copper.
  *  - GM-set override wins (no markup applied)
  *  - Otherwise: base × merchant.markup × (1 - rarityDiscount[rarity])

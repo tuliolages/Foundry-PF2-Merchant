@@ -1,7 +1,7 @@
 // Bulk-import items from any Item compendium pack into a merchant (Loot actor).
 // GM-only. Filters by name, category, rarity, level, source pack.
 
-import { MODULE_ID, formatCopper, formatCopperHtml, priceToCopper, normalizeMerchantType } from "./merchant-store.js";
+import { MODULE_ID, formatCopper, priceToCopper, normalizeMerchantType } from "./merchant-store.js";
 
 const ALLOWED_TYPES = new Set([
   "weapon", "armor", "shield", "consumable", "equipment", "treasure", "backpack",
@@ -202,7 +202,7 @@ class CompendiumPicker {
             <span class="tag tag-pack">${escapeHTML(it.packName)}</span>
           </div>
         </div>
-        <div class="pf2e-cd-mer-picker-row-price">${formatCopperHtml(priceCp)}</div>
+        <div class="pf2e-cd-mer-picker-row-price">${formatCopper(priceCp)}</div>
       </label>
     `;
   }

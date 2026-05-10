@@ -1,6 +1,6 @@
 // Side-by-side comparison modal for 2-3 items.
 
-import { MODULE_ID, effectiveItemPriceCp, formatCopper, formatCopperHtml } from "./merchant-store.js";
+import { MODULE_ID, effectiveItemPriceCp, formatCopper } from "./merchant-store.js";
 
 let _activeModal = null;
 
@@ -57,7 +57,7 @@ function rangeString(item) {
 // Rows displayed across all items, in order. Each: { key, label, get(item) -> string|null }
 function buildRows(items) {
   return [
-    { key: "price",  label: "PF2E_CINEMATIC_MERCHANT.compare.price",  html: true, get: (it) => formatCopperHtml(effectiveItemPriceCp(it)) },
+    { key: "price",  label: "PF2E_CINEMATIC_MERCHANT.compare.price",  get: (it) => formatCopper(effectiveItemPriceCp(it)) },
     { key: "level",  label: "PF2E_CINEMATIC_MERCHANT.compare.level",  get: (it) => String(Number(it.system?.level?.value ?? 0)) },
     { key: "rarity", label: "PF2E_CINEMATIC_MERCHANT.compare.rarity", get: (it) => localizeRarity(it.system?.traits?.rarity ?? "common") },
     { key: "bulk",   label: "PF2E_CINEMATIC_MERCHANT.detail.bulk",    get: (it) => {
@@ -179,7 +179,7 @@ class CompareModal {
         let cls = "pf2e-cd-mer-compare-td";
         if (r.key === "price" && v != null && effectiveItemPriceCp(it) === bestPriceCp && items.length > 1) cls += " is-best";
         if (r.key === "level" && Number(it.system?.level?.value ?? 0) === bestLevel && items.length > 1) cls += " is-highest";
-        return `<td class="${cls}">${r.html ? display : escapeHTML(display)}</td>`;
+        return `<td class="${cls}">${escapeHTML(display)}</td>`;
       }).join("");
       // Skip rows where all values are missing
       const allEmpty = items.every(it => {

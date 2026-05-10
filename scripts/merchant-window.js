@@ -1,7 +1,7 @@
 import {
   MODULE_ID,
   effectiveItemPriceCp,
-  formatCopper, formatCopperHtml,
+  formatCopper,
   priceToCopper,
   copperToCoins,
   getMerchantSellRate,
@@ -240,7 +240,7 @@ export class MerchantWindow {
         ? "PF2E_CINEMATIC_MERCHANT.chat.bought"
         : "PF2E_CINEMATIC_MERCHANT.chat.sold");
       const qtyTag = t.qty > 1 ? `<span class="pf2e-cd-mer-log-qty">×${t.qty}</span>` : "";
-      return `<li><span class="pf2e-cd-mer-log-verb pf2e-cd-mer-log-${t.kind}">${verb}</span> <strong>${escapeHTML(t.name)}</strong> ${qtyTag} <span class="pf2e-cd-mer-log-price">${formatCopperHtml(t.cp)}</span></li>`;
+      return `<li><span class="pf2e-cd-mer-log-verb pf2e-cd-mer-log-${t.kind}">${verb}</span> <strong>${escapeHTML(t.name)}</strong> ${qtyTag} <span class="pf2e-cd-mer-log-price">${formatCopper(t.cp)}</span></li>`;
     }).join("");
     const net = totalSell - totalBuy;
     const netCls = net >= 0 ? "pos" : "neg";
@@ -256,7 +256,7 @@ export class MerchantWindow {
         <div class="pf2e-cd-mer-log-sub">${sessionLabel}</div>
         <ul class="pf2e-cd-mer-log-list">${lines}</ul>
         <div class="pf2e-cd-mer-log-net pf2e-cd-mer-log-net-${netCls}">
-          ${netLabel}: ${net >= 0 ? "+" : "−"} ${formatCopperHtml(Math.abs(net))}
+          ${netLabel}: ${net >= 0 ? "+" : "−"}${formatCopper(Math.abs(net))}
         </div>
       </div>
     `;
@@ -344,7 +344,7 @@ export class MerchantWindow {
         ? "PF2E_CINEMATIC_MERCHANT.window.yourPurse"
         : "PF2E_CINEMATIC_MERCHANT.window.merchantPurse"
     );
-    this.refs.gold.innerHTML = formatCopperHtml(cp);
+    this.refs.gold.textContent = cp > 0 ? formatCopper(cp) : "0 gp";
   }
 
   _wireUI() {
@@ -467,7 +467,7 @@ export class MerchantWindow {
       this.refs.cartBtn.classList.add("has-items");
     }
     if (this.refs.cartCount) {
-      this.refs.cartCount.innerHTML = n > 0 ? `${n} · ${formatCopperHtml(total)}` : "0";
+      this.refs.cartCount.textContent = n > 0 ? `${n} · ${formatCopper(total)}` : "0";
     }
   }
 
@@ -527,7 +527,7 @@ export class MerchantWindow {
         name: summaryName,
         img: distinct === 1 ? lines[0].item.img : "icons/svg/chest.svg",
         qty: itemCount,
-        price: formatCopperHtml(totalCp),
+        price: formatCopper(totalCp),
       });
     } catch (err) {
       console.warn(`${MODULE_ID} | checkout failed:`, err);
@@ -701,7 +701,7 @@ export class MerchantWindow {
       this._logTransaction("sell", item.name, sellQty, totalCp);
       playSell();
       this._showTransactionPopup({
-        kind: "sell", name: item.name, img: item.img, qty: sellQty, price: formatCopperHtml(totalCp),
+        kind: "sell", name: item.name, img: item.img, qty: sellQty, price: formatCopper(totalCp),
       });
     } catch (err) {
       console.warn(`${MODULE_ID} | sell failed:`, err);
@@ -1087,7 +1087,7 @@ export class MerchantWindow {
         <div class="pf2e-cd-mer-item-main">
           <div class="pf2e-cd-mer-item-line1">
             <span class="pf2e-cd-mer-item-name">${escapeHTML(item.name)}</span>
-            <span class="pf2e-cd-mer-item-price">${formatCopperHtml(cp)}${overrideMark}</span>
+            <span class="pf2e-cd-mer-item-price">${formatCopper(cp)}${overrideMark}</span>
           </div>
           <div class="pf2e-cd-mer-item-line2">
             <span class="pf2e-cd-mer-item-tag pf2e-cd-mer-tag-cat">${escapeHTML(localizeCategory(cat))}</span>
@@ -1159,7 +1159,7 @@ export class MerchantWindow {
       this._logTransaction("buy", item.name, buyQty, totalCp);
       playBuy();
       this._showTransactionPopup({
-        kind: "buy", name: item.name, img: item.img, qty: buyQty, price: formatCopperHtml(totalCp),
+        kind: "buy", name: item.name, img: item.img, qty: buyQty, price: formatCopper(totalCp),
       });
     } catch (err) {
       console.warn(`${MODULE_ID} | buy failed:`, err);
@@ -1246,7 +1246,7 @@ export class MerchantWindow {
           ${escapeHTML(verb)}
         </div>
         <div class="pf2e-cd-mer-toast-name">${escapeHTML(name)}${qtyTag}</div>
-        <div class="pf2e-cd-mer-toast-price">${price}</div>
+        <div class="pf2e-cd-mer-toast-price">${escapeHTML(price)}</div>
       </div>
     `;
     document.body.appendChild(root);
@@ -1302,7 +1302,7 @@ export class MerchantWindow {
       game.i18n.localize("PF2E_CINEMATIC_MERCHANT.sell.confirmTitle"),
       game.i18n.format("PF2E_CINEMATIC_MERCHANT.sell.confirm", {
         item: item.name,
-        price: formatCopperHtml(sellCp),
+        price: formatCopper(sellCp),
         rate: Math.round(rate * 100),
       })
     );
@@ -1326,7 +1326,7 @@ export class MerchantWindow {
       const speaker = ChatMessage.getSpeaker({ actor: this.viewer });
       ChatMessage.create({
         speaker,
-        content: `<div class="pf2e-cd-mer-chat-sell"><strong>${escapeHTML(this.viewer.name)}</strong> ${game.i18n.localize("PF2E_CINEMATIC_MERCHANT.chat.sold")} <strong>${escapeHTML(item.name)}</strong> ${game.i18n.localize("PF2E_CINEMATIC_MERCHANT.chat.to")} <em>${escapeHTML(this.actor.name)}</em> ${game.i18n.localize("PF2E_CINEMATIC_MERCHANT.chat.for")} ${formatCopperHtml(sellCp)}.</div>`
+        content: `<div class="pf2e-cd-mer-chat-sell"><strong>${escapeHTML(this.viewer.name)}</strong> ${game.i18n.localize("PF2E_CINEMATIC_MERCHANT.chat.sold")} <strong>${escapeHTML(item.name)}</strong> ${game.i18n.localize("PF2E_CINEMATIC_MERCHANT.chat.to")} <em>${escapeHTML(this.actor.name)}</em> ${game.i18n.localize("PF2E_CINEMATIC_MERCHANT.chat.for")} ${formatCopper(sellCp)}.</div>`
       });
     } catch (err) {
       console.warn(`${MODULE_ID} | sell failed:`, err);

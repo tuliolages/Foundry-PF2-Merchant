@@ -3,7 +3,7 @@
 // merchant window. No extra Loot actor / GM intervention required, since
 // players own their own characters and can update their own flags.
 
-import { MODULE_ID, formatCopper, formatCopperHtml, priceToCopper, isCoinItem } from "./merchant-store.js";
+import { MODULE_ID, formatCopper, priceToCopper, isCoinItem } from "./merchant-store.js";
 import { playVault } from "./sound-fx.js";
 
 const FLAG = "vault";
@@ -293,7 +293,7 @@ class VaultModal {
             <span class="tag tag-rarity rarity-${rarity}">${escapeHTML(localizeRarity(rarity))}</span>
             <span class="tag tag-level">L ${lvl}</span>
             ${qty > 1 ? `<span class="tag tag-qty">×${qty}</span>` : ""}
-            ${priceCp > 0 ? `<span class="tag tag-price">${formatCopperHtml(priceCp)}</span>` : ""}
+            ${priceCp > 0 ? `<span class="tag tag-price">${escapeHTML(formatCopper(priceCp))}</span>` : ""}
           </div>
         </div>
         ${qtySel}
@@ -327,7 +327,7 @@ class VaultModal {
             <span class="tag tag-rarity rarity-${rarity}">${escapeHTML(localizeRarity(rarity))}</span>
             <span class="tag tag-level">L ${lvl}</span>
             ${qty > 1 ? `<span class="tag tag-qty">×${qty}</span>` : ""}
-            ${priceCp > 0 ? `<span class="tag tag-price">${formatCopperHtml(priceCp)}</span>` : ""}
+            ${priceCp > 0 ? `<span class="tag tag-price">${escapeHTML(formatCopper(priceCp))}</span>` : ""}
           </div>
         </div>
         <img class="pf2e-cd-mer-vault-row-img" src="${escapeHTML(entry.img ?? "icons/svg/item-bag.svg")}" alt="" />

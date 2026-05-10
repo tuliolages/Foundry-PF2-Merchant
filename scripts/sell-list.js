@@ -1,6 +1,6 @@
 // Modal listing the player's inventory with Sell buttons per item.
 
-import { MODULE_ID, priceToCopper, formatCopper, formatCopperHtml, getMerchantSellRate, isCoinItem } from "./merchant-store.js";
+import { MODULE_ID, priceToCopper, formatCopper, getMerchantSellRate, isCoinItem } from "./merchant-store.js";
 
 const SELLABLE_TYPES = new Set([
   "weapon", "armor", "shield", "consumable", "equipment", "treasure", "backpack",
@@ -190,7 +190,7 @@ class SellListModal {
     if (!priceEl) return;
     const unitCp = Number(priceEl.dataset.unitCp) || 0;
     const qty = this._readQty(itemId);
-    priceEl.innerHTML = formatCopperHtml(unitCp * qty);
+    priceEl.textContent = formatCopper(unitCp * qty);
   }
 
   _collectSellableItems() {
@@ -231,7 +231,7 @@ class SellListModal {
             ${qty > 1 ? `<span class="tag tag-qty">×${qty}</span>` : ""}
           </div>
         </div>
-        <div class="pf2e-cd-mer-sell-row-price" data-role="sell-price" data-item-id="${item.id}" data-unit-cp="${sellCp}">${formatCopperHtml(sellCp)}</div>
+        <div class="pf2e-cd-mer-sell-row-price" data-role="sell-price" data-item-id="${item.id}" data-unit-cp="${sellCp}">${formatCopper(sellCp)}</div>
         ${qtySelector}
         <button type="button" class="pf2e-cd-mer-sell-row-btn" data-action="sell" data-item-id="${item.id}">
           <i class="fa-solid fa-coins"></i>
