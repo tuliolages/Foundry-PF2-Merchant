@@ -1,7 +1,7 @@
 // Bulk-import items from any Item compendium pack into a merchant (Loot actor).
 // GM-only. Filters by name, category, rarity, level, source pack.
 
-import { MODULE_ID, formatCopper, priceToCopper } from "./merchant-store.js";
+import { MODULE_ID, formatCopper, priceToCopper, normalizeMerchantType } from "./merchant-store.js";
 
 const ALLOWED_TYPES = new Set([
   "weapon", "armor", "shield", "consumable", "equipment", "treasure", "backpack",
@@ -20,17 +20,9 @@ const CATEGORY_CHIPS = [
 ];
 const RARITIES = ["common", "uncommon", "rare", "unique"];
 
-// PF2E stores ammunition as `consumable` with category `ammo`. Normalize it
-// to a virtual "ammunition" type so the category chip / filter can target it.
-function normalizeItemType(it) {
-  const t = it?.type;
-  if (t === "consumable") {
-    const cat = it.system?.category;
-    const consType = it.system?.consumableType?.value ?? it.system?.consumableType;
-    if (cat === "ammo" || cat === "ammunition" || consType === "ammo") return "ammunition";
-  }
-  return t;
-}
+// Use the shared normalizer from merchant-store.js so all entry points
+// classify ammo items identically.
+const normalizeItemType = normalizeMerchantType;
 
 function escapeHTML(s) {
   return String(s ?? "").replace(/[&<>"']/g, ch => ({
@@ -111,7 +103,8 @@ class CompendiumPicker {
       try {
         const idx = await pack.getIndex({ fields: [
           "system.price", "system.level.value", "system.traits.rarity",
-          "system.category", "system.consumableType.value", "system.stackGroup",
+          "system.traits.value", "system.category", "system.consumableType",
+          "system.consumableType.value", "system.stackGroup",
           "type", "img",
         ]});
         const list = [...idx]

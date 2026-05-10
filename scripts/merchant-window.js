@@ -18,6 +18,7 @@ import {
   setItemPriceOverrideCp,
   getItemPriceOverrideCp,
   isCoinItem,
+  normalizeMerchantType,
 } from "./merchant-store.js";
 import { openCompendiumPicker } from "./compendium-picker.js";
 import { openItemDetails } from "./item-details.js";
@@ -1088,12 +1089,6 @@ export class MerchantWindow {
         <i class="fa-solid fa-cart-plus"></i>
       </button>`
       : "";
-    const qtySelector = canBuy && qty > 1 ? `
-      <div class="pf2e-cd-mer-qty" title="${escapeHTML(game.i18n.localize("PF2E_CINEMATIC_MERCHANT.window.qtyHint"))}">
-        <button type="button" class="pf2e-cd-mer-qty-btn" data-action="qty-minus" data-item-id="${item.id}" tabindex="-1">−</button>
-        <input type="number" class="pf2e-cd-mer-qty-input" data-role="qty-input" data-item-id="${item.id}" value="1" min="1" max="${qty}" />
-        <button type="button" class="pf2e-cd-mer-qty-btn" data-action="qty-plus" data-item-id="${item.id}" tabindex="-1">+</button>
-      </div>` : "";
     return `
       <div class="pf2e-cd-mer-item rarity-${rarity}" data-item-id="${item.id}">
         <img class="pf2e-cd-mer-item-img" src="${escapeHTML(img)}" alt="" />
@@ -1112,7 +1107,6 @@ export class MerchantWindow {
         <div class="pf2e-cd-mer-item-actions">
           ${wishlistBtn}
           ${compareBtn}
-          ${qtySelector}
           ${cartAddBtn}
           ${editQtyBtn}
           ${editPriceBtn}
@@ -1137,8 +1131,8 @@ export class MerchantWindow {
     if (requestedQty != null) {
       buyQty = Math.max(1, Math.min(stockQty, Math.floor(requestedQty)));
     } else if (stockQty > 1) {
-      buyQty = this._readRowQty(itemId);
-      buyQty = Math.max(1, Math.min(stockQty, buyQty));
+      buyQty = await this._promptBuyQuantity(item, stockQty);
+      if (buyQty == null) return; // cancelled
     } else {
       buyQty = 1;
     }
@@ -1192,6 +1186,48 @@ export class MerchantWindow {
     return game.i18n.localize(kind === "sell"
       ? "PF2E_CINEMATIC_MERCHANT.warn.sellFailed"
       : "PF2E_CINEMATIC_MERCHANT.warn.buyFailed");
+  }
+
+  /**
+   * Ask the player how many to buy via a small popup. Returns the qty or
+   * null if cancelled. If max is 1, resolves immediately to 1 (no prompt).
+   */
+  async _promptBuyQuantity(item, maxQty) {
+    if (maxQty <= 1) return 1;
+    const DialogV2 = foundry.applications?.api?.DialogV2;
+    if (!DialogV2) return 1;
+    let result = null;
+    try {
+      await DialogV2.prompt({
+        window: { title: game.i18n.localize("PF2E_CINEMATIC_MERCHANT.qtyPrompt.title") },
+        content: `
+          <form class="pf2e-cd-mer-qty-prompt">
+            <div class="pf2e-cd-mer-qty-prompt-card">
+              <img src="${escapeHTML(item.img ?? "icons/svg/item-bag.svg")}" alt="" />
+              <div class="pf2e-cd-mer-qty-prompt-meta">
+                <div class="pf2e-cd-mer-qty-prompt-name">${escapeHTML(item.name)}</div>
+                <div class="pf2e-cd-mer-qty-prompt-stock">${game.i18n.format("PF2E_CINEMATIC_MERCHANT.qtyPrompt.inStock", { n: maxQty })}</div>
+              </div>
+            </div>
+            <label class="pf2e-cd-mer-qty-prompt-input">
+              <span>${game.i18n.localize("PF2E_CINEMATIC_MERCHANT.qtyPrompt.howMany")}</span>
+              <input type="number" name="qty" min="1" max="${maxQty}" value="1" step="1" autofocus />
+            </label>
+          </form>
+        `,
+        classes: ["pf2e-cd-mer-dialog", "pf2e-cd-mer-qty-dialog"],
+        ok: {
+          label: game.i18n.localize("PF2E_CINEMATIC_MERCHANT.qtyPrompt.confirm"),
+          icon: "fa-solid fa-coins",
+          callback: (event, button, dialog) => {
+            const root = dialog?.element instanceof HTMLElement ? dialog.element : dialog?.element?.[0];
+            const raw = Math.floor(Number(root?.querySelector("[name=qty]")?.value ?? 1)) || 1;
+            result = Math.max(1, Math.min(maxQty, raw));
+          },
+        },
+      });
+    } catch { result = null; }
+    return result;
   }
 
   /**

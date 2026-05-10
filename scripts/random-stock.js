@@ -1,7 +1,7 @@
 // Random-Stock-Generator: bulk-fills a merchant with weighted-random items
 // from PF2E compendium packs, filtered by level + categories + rarity weights.
 
-import { MODULE_ID } from "./merchant-store.js";
+import { MODULE_ID, normalizeMerchantType } from "./merchant-store.js";
 
 const ALLOWED_TYPES = new Set([
   "weapon", "armor", "shield", "consumable", "equipment", "treasure", "backpack",
@@ -19,17 +19,7 @@ const CATEGORY_CHIPS = [
   { value: "kit",        icon: "fa-toolbox",             labelKey: "PF2E_CINEMATIC_MERCHANT.cat.kit" },
 ];
 
-// PF2E stores ammunition as `consumable` with category `ammo`. Normalize so
-// our buckets/filters can treat it as its own category.
-function normalizeItemType(it) {
-  const t = it?.type;
-  if (t === "consumable") {
-    const cat = it.system?.category;
-    const consType = it.system?.consumableType?.value ?? it.system?.consumableType;
-    if (cat === "ammo" || cat === "ammunition" || consType === "ammo") return "ammunition";
-  }
-  return t;
-}
+const normalizeItemType = normalizeMerchantType;
 const RARITIES = ["common", "uncommon", "rare", "unique"];
 const DEFAULT_WEIGHTS = { common: 70, uncommon: 25, rare: 4, unique: 1 };
 
@@ -99,8 +89,9 @@ class RandomStockDialog {
     for (const pack of packs) {
       try {
         const idx = await pack.getIndex({ fields: [
-          "system.level.value", "system.traits.rarity", "system.category",
-          "system.consumableType.value", "type",
+          "system.level.value", "system.traits.rarity", "system.traits.value",
+          "system.category", "system.consumableType", "system.consumableType.value",
+          "system.stackGroup", "type",
         ] });
         for (const it of idx) {
           const normType = normalizeItemType(it);

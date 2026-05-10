@@ -133,6 +133,45 @@ export function getItemDataIdentityKey(itemData) {
   return `nm:${itemData.name ?? ""}|${itemData.type ?? ""}`;
 }
 
+// --- Ammunition detection (PF2E uses `consumable` + several markers) ---
+
+const AMMO_STACK_GROUPS = new Set([
+  "arrows", "bolts", "blowgunDarts", "blowgun-darts",
+  "rounds", "slingBullets", "sling-bullets", "shuriken",
+  "darts", "stones", "rockArrows", "pellets",
+]);
+
+/**
+ * True if this PF2E item is ammunition. Checks all the spots PF2E might
+ * carry the marker depending on system version:
+ *  - direct type "ammunition" / "ammo"
+ *  - consumable with system.category in {"ammo","ammunition"}
+ *  - consumable with system.consumableType in {"ammo","ammunition"}
+ *  - consumable with a known ammo stack group (arrows, bolts, ...)
+ *  - consumable carrying the "ammunition" trait
+ */
+export function isAmmunitionItem(it) {
+  if (!it) return false;
+  const t = it.type;
+  if (t === "ammunition" || t === "ammo") return true;
+  if (t !== "consumable") return false;
+  const sys = it.system ?? {};
+  if (sys.category === "ammo" || sys.category === "ammunition") return true;
+  const consType = sys.consumableType?.value ?? sys.consumableType;
+  if (consType === "ammo" || consType === "ammunition") return true;
+  if (sys.stackGroup && AMMO_STACK_GROUPS.has(sys.stackGroup)) return true;
+  const traits = sys.traits?.value;
+  if (Array.isArray(traits) && traits.includes("ammunition")) return true;
+  return false;
+}
+
+/** Normalized item type for merchant categorization. Maps ammo subtypes
+    of `consumable` up to a virtual "ammunition" category. */
+export function normalizeMerchantType(it) {
+  if (isAmmunitionItem(it)) return "ammunition";
+  return it?.type;
+}
+
 // --- Coin detection ---
 
 const COIN_SLUGS = new Set(["platinum-pieces", "gold-pieces", "silver-pieces", "copper-pieces"]);

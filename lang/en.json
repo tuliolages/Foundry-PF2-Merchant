@@ -84,6 +84,11 @@
   "PF2E_CINEMATIC_MERCHANT.warn.itemWorthless": "This item has no value.",
   "PF2E_CINEMATIC_MERCHANT.warn.noGM": "No active GM — transactions need a GM online.",
   "PF2E_CINEMATIC_MERCHANT.warn.needGMPermission": "Merchant needs ownership refresh — ask the GM to open this merchant once.",
+  "PF2E_CINEMATIC_MERCHANT.qtyPrompt.title": "How many to buy?",
+  "PF2E_CINEMATIC_MERCHANT.qtyPrompt.howMany": "Quantity",
+  "PF2E_CINEMATIC_MERCHANT.qtyPrompt.inStock": "In stock: {n}",
+  "PF2E_CINEMATIC_MERCHANT.qtyPrompt.confirm": "Buy",
+
   "PF2E_CINEMATIC_MERCHANT.toast.bought": "Purchase complete",
   "PF2E_CINEMATIC_MERCHANT.toast.sold": "Sale complete",
   "PF2E_CINEMATIC_MERCHANT.toast.checkout": "Checkout complete",

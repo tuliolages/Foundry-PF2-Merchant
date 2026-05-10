@@ -2353,6 +2353,77 @@
 .pf2e-cd-mer-log-net-pos { color: #1a6b1a; }
 .pf2e-cd-mer-log-net-neg { color: var(--pf2e-mer-red); }
 
+/* === Buy quantity prompt === */
+.pf2e-cd-mer-qty-dialog .pf2e-cd-mer-qty-prompt {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  font-family: "Eczar", "EB Garamond", Georgia, serif;
+}
+.pf2e-cd-mer-qty-prompt-card {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 10px 12px;
+  background:
+    repeating-linear-gradient(0deg, rgba(180, 150, 90, 0.05) 0 2px, transparent 2px 4px),
+    rgba(255, 249, 232, 0.7);
+  border: 1px solid rgba(120, 90, 40, 0.4);
+  border-radius: 4px;
+}
+.pf2e-cd-mer-qty-prompt-card img {
+  width: 52px;
+  height: 52px;
+  object-fit: contain;
+  border: 1px solid var(--pf2e-mer-gold);
+  border-radius: 3px;
+  background: #fff8e8;
+  flex: 0 0 auto;
+}
+.pf2e-cd-mer-qty-prompt-meta { flex: 1; min-width: 0; }
+.pf2e-cd-mer-qty-prompt-name {
+  font-weight: 700;
+  font-size: 15px;
+  color: var(--pf2e-mer-text, #1a0e05);
+}
+.pf2e-cd-mer-qty-prompt-stock {
+  font-size: 11px;
+  font-style: italic;
+  color: rgba(50, 25, 10, 0.7);
+  margin-top: 2px;
+  letter-spacing: 0.5px;
+}
+.pf2e-cd-mer-qty-prompt-input {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font-family: "Eczar", Georgia, serif;
+}
+.pf2e-cd-mer-qty-prompt-input span {
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 2px;
+  color: var(--pf2e-mer-red);
+}
+.pf2e-cd-mer-qty-prompt-input input[type=number] {
+  width: 100%;
+  padding: 10px 14px;
+  font-family: Georgia, serif;
+  font-size: 22px;
+  font-weight: 700;
+  text-align: center;
+  color: var(--pf2e-mer-text, #1a0e05);
+  background: #fff8e8;
+  border: 1px solid var(--pf2e-mer-gold);
+  border-radius: 3px;
+}
+.pf2e-cd-mer-qty-prompt-input input[type=number]:focus {
+  outline: none;
+  border-color: var(--pf2e-mer-red);
+  box-shadow: 0 0 0 2px rgba(94, 0, 0, 0.15);
+}
+
 /* === After-sale confirmation toast (custom popup, not Foundry's notif) === */
 .pf2e-cd-mer-toast {
   position: fixed;
