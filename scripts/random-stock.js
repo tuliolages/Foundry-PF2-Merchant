@@ -5,16 +5,31 @@ import { MODULE_ID } from "./merchant-store.js";
 
 const ALLOWED_TYPES = new Set([
   "weapon", "armor", "shield", "consumable", "equipment", "treasure", "backpack",
+  "ammunition", "ammo", "kit",
 ]);
 const CATEGORY_CHIPS = [
   { value: "weapon",     icon: "fa-hammer",              labelKey: "PF2E_CINEMATIC_MERCHANT.cat.weapon" },
   { value: "armor",      icon: "fa-shirt",               labelKey: "PF2E_CINEMATIC_MERCHANT.cat.armor" },
   { value: "shield",     icon: "fa-shield-halved",       labelKey: "PF2E_CINEMATIC_MERCHANT.cat.shield" },
   { value: "consumable", icon: "fa-flask",               labelKey: "PF2E_CINEMATIC_MERCHANT.cat.consumable" },
+  { value: "ammunition", icon: "fa-bolt-lightning",      labelKey: "PF2E_CINEMATIC_MERCHANT.cat.ammunition" },
   { value: "equipment",  icon: "fa-screwdriver-wrench",  labelKey: "PF2E_CINEMATIC_MERCHANT.cat.equipment" },
   { value: "treasure",   icon: "fa-gem",                 labelKey: "PF2E_CINEMATIC_MERCHANT.cat.treasure" },
   { value: "backpack",   icon: "fa-suitcase",            labelKey: "PF2E_CINEMATIC_MERCHANT.cat.container" },
+  { value: "kit",        icon: "fa-toolbox",             labelKey: "PF2E_CINEMATIC_MERCHANT.cat.kit" },
 ];
+
+// PF2E stores ammunition as `consumable` with category `ammo`. Normalize so
+// our buckets/filters can treat it as its own category.
+function normalizeItemType(it) {
+  const t = it?.type;
+  if (t === "consumable") {
+    const cat = it.system?.category;
+    const consType = it.system?.consumableType?.value ?? it.system?.consumableType;
+    if (cat === "ammo" || cat === "ammunition" || consType === "ammo") return "ammunition";
+  }
+  return t;
+}
 const RARITIES = ["common", "uncommon", "rare", "unique"];
 const DEFAULT_WEIGHTS = { common: 70, uncommon: 25, rare: 4, unique: 1 };
 
@@ -83,13 +98,17 @@ class RandomStockDialog {
     const all = [];
     for (const pack of packs) {
       try {
-        const idx = await pack.getIndex({ fields: ["system.level.value", "system.traits.rarity", "type"] });
+        const idx = await pack.getIndex({ fields: [
+          "system.level.value", "system.traits.rarity", "system.category",
+          "system.consumableType.value", "type",
+        ] });
         for (const it of idx) {
-          if (!ALLOWED_TYPES.has(it.type)) continue;
+          const normType = normalizeItemType(it);
+          if (!ALLOWED_TYPES.has(normType)) continue;
           all.push({
             packId: pack.collection,
             _id: it._id ?? it.id,
-            type: it.type,
+            type: normType,
             level: Number(it.system?.level?.value ?? 0),
             rarity: it.system?.traits?.rarity ?? "common",
           });

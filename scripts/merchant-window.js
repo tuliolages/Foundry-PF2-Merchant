@@ -26,7 +26,7 @@ import { openCompareModal } from "./compare-modal.js";
 import { openRandomStockDialog } from "./random-stock.js";
 import { isWishlisted, toggleWishlist, getAllWishlistKeys, getItemKey } from "./wishlist.js";
 import { Cart, openCartDrawer } from "./cart.js";
-import { playOpen, playBuy, playSell } from "./sound-fx.js";
+import { playOpen, playBuy, playSell, playClick } from "./sound-fx.js";
 import { openVault, vaultCount } from "./vault.js";
 import { callGM } from "./socket-bridge.js";
 
@@ -36,10 +36,24 @@ const CATEGORIES = [
   { value: "armor",      labelKey: "PF2E_CINEMATIC_MERCHANT.cat.armor",      icon: "fa-shirt" },
   { value: "shield",     labelKey: "PF2E_CINEMATIC_MERCHANT.cat.shield",     icon: "fa-shield-halved" },
   { value: "consumable", labelKey: "PF2E_CINEMATIC_MERCHANT.cat.consumable", icon: "fa-flask" },
+  { value: "ammunition", labelKey: "PF2E_CINEMATIC_MERCHANT.cat.ammunition", icon: "fa-bolt-lightning" },
   { value: "equipment",  labelKey: "PF2E_CINEMATIC_MERCHANT.cat.equipment",  icon: "fa-screwdriver-wrench" },
   { value: "treasure",   labelKey: "PF2E_CINEMATIC_MERCHANT.cat.treasure",   icon: "fa-gem" },
   { value: "backpack",   labelKey: "PF2E_CINEMATIC_MERCHANT.cat.container",  icon: "fa-suitcase" },
+  { value: "kit",        labelKey: "PF2E_CINEMATIC_MERCHANT.cat.kit",        icon: "fa-toolbox" },
 ];
+
+// Ammunition is sometimes stored as `consumable` with system.category="ammo"
+// in PF2E. Treat those rows as ammunition everywhere we group/filter by type.
+function effectiveItemType(it) {
+  const t = it?.type;
+  if (t === "consumable") {
+    const cat = it.system?.category;
+    const consType = it.system?.consumableType?.value ?? it.system?.consumableType;
+    if (cat === "ammo" || cat === "ammunition" || consType === "ammo") return "ammunition";
+  }
+  return t;
+}
 
 function localizeRarity(rarity) {
   const v = game.i18n.localize(`PF2E_CINEMATIC_MERCHANT.rarity.${rarity}`);
@@ -51,7 +65,7 @@ function localizeCategory(slug) {
   const map = {
     weapon: "weapon", armor: "armor", shield: "shield",
     consumable: "consumable", equipment: "equipment", treasure: "treasure",
-    backpack: "container",
+    backpack: "container", ammunition: "ammunition", ammo: "ammunition", kit: "kit",
   };
   const key = `PF2E_CINEMATIC_MERCHANT.cat.${map[slug] ?? slug}`;
   const v = game.i18n.localize(key);
@@ -382,6 +396,21 @@ export class MerchantWindow {
     // ESC closes
     this.root.addEventListener("keydown", (e) => {
       if (e.key === "Escape") this.close();
+    });
+
+    // Global click-feedback sound on any interactive element inside the window.
+    this.root.addEventListener("click", (e) => {
+      const t = e.target;
+      if (!t?.closest) return;
+      // Match real interactive things (buttons, action attributes, tiles,
+      // filter pills, dropdown options) — skip plain text / row body clicks
+      // so we don't spam the sound during navigation.
+      const isInteractive = t.closest(
+        "button, [data-action], select, input[type=checkbox], input[type=radio], " +
+        ".pf2e-cd-mer-cat-tile, .pf2e-cd-mer-filter-toggle, .pf2e-cd-mer-compare-btn, " +
+        ".pf2e-cd-mer-wishlist-btn, .pf2e-cd-mer-cart-add-btn"
+      );
+      if (isInteractive) playClick();
     });
   }
 
@@ -800,7 +829,10 @@ export class MerchantWindow {
 
     const items = this._collectItems();
     const counts = {};
-    for (const it of items) counts[it.type] = (counts[it.type] ?? 0) + 1;
+    for (const it of items) {
+      const t = effectiveItemType(it);
+      counts[t] = (counts[t] ?? 0) + 1;
+    }
     const totalCount = items.length;
 
     const tiles = [];
@@ -970,7 +1002,8 @@ export class MerchantWindow {
     const items = this.actor.items ?? [];
     return [...items].filter(it => {
       if (isCoinItem(it)) return false;
-      return it.system?.price !== undefined || ["weapon","armor","shield","consumable","equipment","treasure","backpack"].includes(it.type);
+      const allowed = new Set(["weapon","armor","shield","consumable","equipment","treasure","backpack","ammunition","kit"]);
+      return it.system?.price !== undefined || allowed.has(it.type);
     });
   }
 
@@ -983,7 +1016,7 @@ export class MerchantWindow {
     const wishKeys = f.wishlistOnly ? getAllWishlistKeys() : null;
     const filtered = items.filter(it => {
       if (f.search && !it.name.toLowerCase().includes(f.search)) return false;
-      if (f.category !== "all" && it.type !== f.category) return false;
+      if (f.category !== "all" && effectiveItemType(it) !== f.category) return false;
       if (f.rarity !== "all") {
         const r = it.system?.traits?.rarity ?? "common";
         if (r !== f.rarity) return false;
@@ -1022,7 +1055,7 @@ export class MerchantWindow {
     const qty = Number(item.system?.quantity ?? 1);
     const lvl = Number(item.system?.level?.value ?? 0);
     const rarity = item.system?.traits?.rarity ?? "common";
-    const cat = item.type;
+    const cat = effectiveItemType(item);
     const img = item.img ?? "icons/svg/item-bag.svg";
     const canBuy = !!this.viewer && qty > 0;
     const editPriceBtn = game.user.isGM

@@ -10,6 +10,7 @@ const FLAG = "vault";
 
 const VAULTABLE_TYPES = new Set([
   "weapon", "armor", "shield", "consumable", "equipment", "treasure", "backpack",
+  "ammunition", "ammo", "kit",
 ]);
 
 function escapeHTML(s) {

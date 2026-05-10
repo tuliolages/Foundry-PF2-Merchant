@@ -46,6 +46,8 @@
   "PF2E_CINEMATIC_MERCHANT.cat.equipment": "Ausrüstung",
   "PF2E_CINEMATIC_MERCHANT.cat.treasure": "Schätze",
   "PF2E_CINEMATIC_MERCHANT.cat.container": "Behälter",
+  "PF2E_CINEMATIC_MERCHANT.cat.ammunition": "Munition",
+  "PF2E_CINEMATIC_MERCHANT.cat.kit": "Sets",
   "PF2E_CINEMATIC_MERCHANT.cat.wishlist": "Wunschliste",
 
   "PF2E_CINEMATIC_MERCHANT.rarity.all": "Beliebige Seltenheit",

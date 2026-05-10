@@ -149,3 +149,10 @@ export function playVault() {
   if (!isEnabled()) return;
   playPath(getPath(KEYS.vault, DEFAULT_VAULT), readVolume());
 }
+
+// Generic UI click — reuses the vault pop sound at a lower volume so it
+// doesn't drown out buy/sell coin sounds when both fire on the same click.
+export function playClick() {
+  if (!isEnabled()) return;
+  playPath(getPath(KEYS.vault, DEFAULT_VAULT), readVolume() * 0.4);
+}

@@ -5,17 +5,32 @@ import { MODULE_ID, formatCopper, priceToCopper } from "./merchant-store.js";
 
 const ALLOWED_TYPES = new Set([
   "weapon", "armor", "shield", "consumable", "equipment", "treasure", "backpack",
+  "ammunition", "ammo", "kit",
 ]);
 const CATEGORY_CHIPS = [
   { value: "weapon",     icon: "fa-hammer",              labelKey: "PF2E_CINEMATIC_MERCHANT.cat.weapon" },
   { value: "armor",      icon: "fa-shirt",               labelKey: "PF2E_CINEMATIC_MERCHANT.cat.armor" },
   { value: "shield",     icon: "fa-shield-halved",       labelKey: "PF2E_CINEMATIC_MERCHANT.cat.shield" },
   { value: "consumable", icon: "fa-flask",               labelKey: "PF2E_CINEMATIC_MERCHANT.cat.consumable" },
+  { value: "ammunition", icon: "fa-bolt-lightning",      labelKey: "PF2E_CINEMATIC_MERCHANT.cat.ammunition" },
   { value: "equipment",  icon: "fa-screwdriver-wrench",  labelKey: "PF2E_CINEMATIC_MERCHANT.cat.equipment" },
   { value: "treasure",   icon: "fa-gem",                 labelKey: "PF2E_CINEMATIC_MERCHANT.cat.treasure" },
   { value: "backpack",   icon: "fa-suitcase",            labelKey: "PF2E_CINEMATIC_MERCHANT.cat.container" },
+  { value: "kit",        icon: "fa-toolbox",             labelKey: "PF2E_CINEMATIC_MERCHANT.cat.kit" },
 ];
 const RARITIES = ["common", "uncommon", "rare", "unique"];
+
+// PF2E stores ammunition as `consumable` with category `ammo`. Normalize it
+// to a virtual "ammunition" type so the category chip / filter can target it.
+function normalizeItemType(it) {
+  const t = it?.type;
+  if (t === "consumable") {
+    const cat = it.system?.category;
+    const consType = it.system?.consumableType?.value ?? it.system?.consumableType;
+    if (cat === "ammo" || cat === "ammunition" || consType === "ammo") return "ammunition";
+  }
+  return t;
+}
 
 function escapeHTML(s) {
   return String(s ?? "").replace(/[&<>"']/g, ch => ({
@@ -95,12 +110,15 @@ class CompendiumPicker {
     for (const pack of itemPacks) {
       try {
         const idx = await pack.getIndex({ fields: [
-          "system.price", "system.level.value", "system.traits.rarity", "type", "img",
+          "system.price", "system.level.value", "system.traits.rarity",
+          "system.category", "system.consumableType.value", "system.stackGroup",
+          "type", "img",
         ]});
         const list = [...idx]
-          .filter(it => ALLOWED_TYPES.has(it.type))
+          .filter(it => ALLOWED_TYPES.has(normalizeItemType(it)))
           .map(it => ({
             ...it,
+            type: normalizeItemType(it),
             packId: pack.collection,
             packName: pack.metadata.label ?? pack.collection,
           }));

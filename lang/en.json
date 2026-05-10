@@ -46,6 +46,8 @@
   "PF2E_CINEMATIC_MERCHANT.cat.equipment": "Equipment",
   "PF2E_CINEMATIC_MERCHANT.cat.treasure": "Treasure",
   "PF2E_CINEMATIC_MERCHANT.cat.container": "Containers",
+  "PF2E_CINEMATIC_MERCHANT.cat.ammunition": "Ammunition",
+  "PF2E_CINEMATIC_MERCHANT.cat.kit": "Kits",
   "PF2E_CINEMATIC_MERCHANT.cat.wishlist": "Wishlist",
 
   "PF2E_CINEMATIC_MERCHANT.rarity.all": "Any rarity",

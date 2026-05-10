@@ -4,6 +4,7 @@ import { MODULE_ID, priceToCopper, formatCopper, getMerchantSellRate, isCoinItem
 
 const SELLABLE_TYPES = new Set([
   "weapon", "armor", "shield", "consumable", "equipment", "treasure", "backpack",
+  "ammunition", "ammo", "kit",
 ]);
 
 let _activeModal = null;
@@ -32,7 +33,7 @@ function localizeRarity(r) {
 }
 
 function localizeCategory(slug) {
-  const map = { weapon:"weapon", armor:"armor", shield:"shield", consumable:"consumable", equipment:"equipment", treasure:"treasure", backpack:"container" };
+  const map = { weapon:"weapon", armor:"armor", shield:"shield", consumable:"consumable", equipment:"equipment", treasure:"treasure", backpack:"container", ammunition:"ammunition", ammo:"ammunition", kit:"kit" };
   const key = `PF2E_CINEMATIC_MERCHANT.cat.${map[slug] ?? slug}`;
   const v = game.i18n.localize(key);
   if (v && !v.startsWith("PF2E_CINEMATIC_MERCHANT.")) return v;
