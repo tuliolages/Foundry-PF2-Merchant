@@ -1,0 +1,28 @@
+{
+  "id": "pf2e-cinematic-merchant",
+  "title": "PF2E Cinematic Merchant",
+  "description": "Simple merchant shops for Pathfinder 2e. Link a Loot actor to any tile in the scene, fill it from the compendium browser, and let players browse with rich filtering by category, rarity and level.",
+  "version": "0.1.0",
+  "compatibility": {
+    "minimum": "13",
+    "verified": "14"
+  },
+  "authors": [
+    { "name": "gooze" }
+  ],
+  "esmodules": [
+    "scripts/module.js"
+  ],
+  "styles": [
+    "styles/merchant.css"
+  ],
+  "languages": [
+    { "lang": "en", "name": "English", "path": "lang/en.json" },
+    { "lang": "de", "name": "Deutsch", "path": "lang/de.json" }
+  ],
+  "relationships": {
+    "systems": [
+      { "id": "pf2e", "type": "requires" }
+    ]
+  }
+}
