@@ -84,11 +84,6 @@
   "PF2E_CINEMATIC_MERCHANT.warn.itemWorthless": "Dieses Item hat keinen Wert.",
   "PF2E_CINEMATIC_MERCHANT.warn.noGM": "Kein GM online — für Transaktionen muss ein GM aktiv sein.",
   "PF2E_CINEMATIC_MERCHANT.warn.needGMPermission": "Händler braucht Rechte-Refresh — der GM soll diesen Händler einmal öffnen.",
-  "PF2E_CINEMATIC_MERCHANT.coin.pp": "Platinmünzen",
-  "PF2E_CINEMATIC_MERCHANT.coin.gp": "Goldmünzen",
-  "PF2E_CINEMATIC_MERCHANT.coin.sp": "Silbermünzen",
-  "PF2E_CINEMATIC_MERCHANT.coin.cp": "Kupfermünzen",
-
   "PF2E_CINEMATIC_MERCHANT.qtyPrompt.title": "Wie viele kaufen?",
   "PF2E_CINEMATIC_MERCHANT.qtyPrompt.howMany": "Menge",
   "PF2E_CINEMATIC_MERCHANT.qtyPrompt.inStock": "Auf Lager: {n}",
