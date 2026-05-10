@@ -671,7 +671,7 @@ export class MerchantWindow {
       ui.notifications?.warn(game.i18n.localize("PF2E_CINEMATIC_MERCHANT.warn.noViewerActor"));
       return;
     }
-    openSellList(this.viewer, this.actor, (item) => this._sellItem(item));
+    openSellList(this.viewer, this.actor, (item, qty) => this._sellItem(item, qty));
   }
 
   async _sellItem(item, requestedQty = 1) {
