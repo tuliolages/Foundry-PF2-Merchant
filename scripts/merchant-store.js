@@ -104,6 +104,35 @@ export async function setMerchantRarityDiscounts(actor, discounts) {
   return actor.update({ [`flags.${MODULE_ID}.rarityDiscounts`]: clean });
 }
 
+// --- Item identity (for merging duplicate stacks on a merchant) ---
+
+/**
+ * Stable key that identifies "the same item" so we can merge duplicate
+ * stacks instead of creating second entries. Prefer the compendium
+ * sourceId; fall back to name+type for hand-rolled items.
+ */
+export function getItemIdentityKey(item) {
+  if (!item) return null;
+  const src = item.flags?.core?.sourceId
+           ?? item._stats?.compendiumSource
+           ?? item.flags?.core?.compendiumSource
+           ?? null;
+  if (src) return `src:${src}`;
+  const name = item.name ?? "";
+  const type = item.type ?? "";
+  return `nm:${name}|${type}`;
+}
+
+export function getItemDataIdentityKey(itemData) {
+  if (!itemData) return null;
+  const src = itemData.flags?.core?.sourceId
+           ?? itemData._stats?.compendiumSource
+           ?? itemData.flags?.core?.compendiumSource
+           ?? null;
+  if (src) return `src:${src}`;
+  return `nm:${itemData.name ?? ""}|${itemData.type ?? ""}`;
+}
+
 // --- Coin detection ---
 
 const COIN_SLUGS = new Set(["platinum-pieces", "gold-pieces", "silver-pieces", "copper-pieces"]);

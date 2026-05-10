@@ -1,4 +1,4 @@
-import { MODULE_ID, getMerchantActor, getTileMerchantActorId, ensureMerchantOwnership } from "./merchant-store.js";
+import { MODULE_ID, getMerchantActor, getTileMerchantActorId, ensureMerchantOwnership, getItemIdentityKey, isCoinItem } from "./merchant-store.js";
 import { registerTileHooks } from "./tile-link.js";
 import { MerchantWindow } from "./merchant-window.js";
 import { registerSoundSettings } from "./sound-fx.js";
@@ -40,6 +40,33 @@ Hooks.once("ready", async () => {
     const actor = app?.actor;
     if (!actor || actor.type !== "loot") return;
     ensureMerchantOwnership(actor);
+  });
+
+  // Auto-merge duplicate stacks: when an item is created on a Loot actor
+  // and a sibling with the same identity already exists, bump the existing
+  // quantity and delete the new entry. Keeps merchant inventories tidy
+  // regardless of how items got there (import, sell-in, random stock, drag).
+  Hooks.on("createItem", async (item, _options, userId) => {
+    if (game.user.id !== userId) return;          // only the originator runs
+    const parent = item?.parent;
+    if (!parent || parent.type !== "loot") return; // merchants only
+    if (isCoinItem(item)) return;                  // coin items are PF2E-managed
+    const key = getItemIdentityKey(item);
+    if (!key) return;
+    let target = null;
+    for (const sibling of parent.items) {
+      if (sibling.id === item.id) continue;
+      if (getItemIdentityKey(sibling) === key) { target = sibling; break; }
+    }
+    if (!target) return;
+    try {
+      const targetQty = Math.max(1, Number(target.system?.quantity ?? 1));
+      const incomingQty = Math.max(1, Number(item.system?.quantity ?? 1));
+      await target.update({ "system.quantity": targetQty + incomingQty });
+      await item.delete();
+    } catch (err) {
+      console.warn(`${MODULE_ID} | merge duplicate item failed:`, err);
+    }
   });
   // Wire socket bridge so the active GM can serve as a fallback when a
   // player's direct ops are denied by Foundry permissions.
