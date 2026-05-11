@@ -443,8 +443,8 @@ export class MerchantWindow {
     if (svcEdit) { e.stopPropagation(); this._handleServiceEdit(svcEdit.dataset.serviceId); return; }
     const svcDel = e.target.closest("[data-action=service-delete]");
     if (svcDel) { e.stopPropagation(); this._handleServiceDelete(svcDel.dataset.serviceId); return; }
-    // Don't open item-details for service rows
-    if (e.target.closest(".pf2e-cd-mer-service-row")) return;
+    const svcRow = e.target.closest(".pf2e-cd-mer-service-row");
+    if (svcRow) { this._showServiceDetails(svcRow.dataset.serviceId); return; }
     const row = e.target.closest(".pf2e-cd-mer-item");
     if (row) this._handleShowDetails(row.dataset.itemId);
   }
@@ -886,6 +886,57 @@ export class MerchantWindow {
         </div>
       </div>
     `;
+  }
+
+  async _showServiceDetails(serviceId) {
+    if (!this.actor) return;
+    const services = getMerchantServices(this.actor);
+    const s = services.find(x => x.id === serviceId);
+    if (!s) return;
+    const DialogV2 = foundry.applications?.api?.DialogV2;
+    if (!DialogV2) return;
+    const rarity = s.rarity ?? "common";
+    const canBuy = !!this.viewer;
+    const buttons = [];
+    if (canBuy) {
+      buttons.push({
+        action: "buy",
+        label: `${game.i18n.localize("PF2E_CINEMATIC_MERCHANT.service.pay")} — ${formatCopper(Math.max(0, s.priceCp ?? 0))}`,
+        icon: "fa-solid fa-handshake",
+        default: true,
+        callback: () => this._handleBuyService(serviceId),
+      });
+    }
+    buttons.push({
+      action: "close",
+      label: game.i18n.localize("PF2E_CINEMATIC_MERCHANT.window.close"),
+      icon: "fa-solid fa-xmark",
+    });
+
+    const desc = (s.description ?? "").trim();
+    const content = `
+      <div class="pf2e-cd-mer-service-detail">
+        <div class="pf2e-cd-mer-service-detail-header">
+          <img src="${escapeHTML(s.img ?? "icons/svg/book.svg")}" alt="" />
+          <div>
+            <div class="pf2e-cd-mer-service-detail-name">${escapeHTML(s.name)}</div>
+            <div class="pf2e-cd-mer-service-detail-meta">
+              <span class="pf2e-cd-mer-item-tag pf2e-cd-mer-tag-cat">${escapeHTML(game.i18n.localize("PF2E_CINEMATIC_MERCHANT.cat.services"))}</span>
+              <span class="pf2e-cd-mer-item-tag pf2e-cd-mer-tag-rarity rarity-${rarity}">${escapeHTML(localizeRarity(rarity))}</span>
+              ${s.level > 0 ? `<span class="pf2e-cd-mer-item-tag pf2e-cd-mer-tag-level">L ${s.level}</span>` : ""}
+              <span class="pf2e-cd-mer-item-tag pf2e-cd-mer-tag-price">${escapeHTML(formatCopper(s.priceCp ?? 0))}</span>
+            </div>
+          </div>
+        </div>
+        ${desc ? `<div class="pf2e-cd-mer-service-detail-desc">${escapeHTML(desc).replace(/\n/g, "<br/>")}</div>` : ""}
+      </div>
+    `;
+    await DialogV2.wait({
+      window: { title: s.name },
+      classes: ["pf2e-cd-mer-dialog", "pf2e-cd-mer-service-detail-dialog"],
+      content,
+      buttons,
+    }).catch(() => {});
   }
 
   async _handleBuyService(serviceId) {
