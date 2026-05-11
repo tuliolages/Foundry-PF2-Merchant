@@ -2762,14 +2762,19 @@ dialog.pf2e-cd-mer-qty-dialog,
 }
 .pf2e-cd-mer-service-detail-dialog button[data-action="buy"] i { color: #ffd76b; }
 
-/* GM "Add service" button at the top of the services list */
-.pf2e-cd-mer-service-add {
+/* GM toolbar above the services list */
+.pf2e-cd-mer-service-toolbar {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+.pf2e-cd-mer-service-add,
+.pf2e-cd-mer-service-clear {
   display: flex;
   align-items: center;
   justify-content: center;
   gap: 8px;
-  width: 100%;
-  margin-bottom: 6px;
+  flex: 1;
   padding: 10px 14px;
   font-family: "Eczar", "EB Garamond", Georgia, serif;
   font-size: 12px;
@@ -2777,16 +2782,29 @@ dialog.pf2e-cd-mer-qty-dialog,
   letter-spacing: 2px;
   text-transform: uppercase;
   color: var(--pf2e-mer-cream-warm, #f4ecd8);
-  background: linear-gradient(180deg, #5a4818 0%, var(--pf2e-mer-gold, #785a28) 100%);
-  border: 1px solid var(--pf2e-mer-gold-light, #b8923a);
   border-radius: 3px;
   cursor: pointer;
   transition: background 140ms, transform 140ms;
+}
+.pf2e-cd-mer-service-add {
+  background: linear-gradient(180deg, #5a4818 0%, var(--pf2e-mer-gold, #785a28) 100%);
+  border: 1px solid var(--pf2e-mer-gold-light, #b8923a);
 }
 .pf2e-cd-mer-service-add:hover {
   background: linear-gradient(180deg, #7a6428 0%, #9c7a32 100%);
   transform: translateY(-1px);
 }
+.pf2e-cd-mer-service-clear {
+  background: linear-gradient(180deg, #3a0000 0%, var(--pf2e-mer-red, #5e0000) 100%);
+  border: 1px solid #8a1f1f;
+  flex: 0 0 auto;
+  min-width: 160px;
+}
+.pf2e-cd-mer-service-clear:hover {
+  background: linear-gradient(180deg, #5a0000 0%, #7a1414 100%);
+  transform: translateY(-1px);
+}
+.pf2e-cd-mer-service-clear i { color: #ffb8b8; }
 
 /* Service editor dialog */
 .pf2e-cd-mer-service-form { display: flex; flex-direction: column; gap: 10px; font-family: "Eczar", Georgia, serif; }
@@ -2823,10 +2841,131 @@ dialog.pf2e-cd-mer-qty-dialog,
   border-color: var(--pf2e-mer-red, #5e0000) !important;
   box-shadow: 0 0 0 2px rgba(94, 0, 0, 0.18), inset 0 1px 2px rgba(120, 90, 40, 0.12) !important;
 }
+.pf2e-cd-mer-service-form select,
+.pf2e-cd-mer-service-dialog select {
+  appearance: none !important;
+  -webkit-appearance: none !important;
+  -moz-appearance: none !important;
+  padding-right: 32px !important;
+  background-image:
+    linear-gradient(45deg, transparent 50%, #785a28 50%),
+    linear-gradient(135deg, #785a28 50%, transparent 50%),
+    linear-gradient(180deg, #fff8e8 0%, #f4ecd8 100%) !important;
+  background-position:
+    calc(100% - 16px) 50%,
+    calc(100% - 11px) 50%,
+    0 0 !important;
+  background-size: 5px 5px, 5px 5px, 100% 100% !important;
+  background-repeat: no-repeat !important;
+  cursor: pointer !important;
+  color: #1a0e05 !important;
+  -webkit-text-fill-color: #1a0e05 !important;
+  opacity: 1 !important;
+  text-shadow: none !important;
+  font-weight: 600 !important;
+}
+.pf2e-cd-mer-service-form select[multiple],
+.pf2e-cd-mer-service-dialog select[multiple] {
+  background-image: linear-gradient(180deg, #fff8e8 0%, #f9f0db 100%) !important;
+  padding: 4px !important;
+  cursor: default !important;
+  font-weight: 500 !important;
+  min-height: 220px !important;
+  overflow-y: auto !important;
+}
+.pf2e-cd-mer-service-form select[multiple] option,
+.pf2e-cd-mer-service-dialog select[multiple] option {
+  display: block !important;
+  padding: 4px 8px !important;
+  margin: 1px 0 !important;
+  border-radius: 2px !important;
+  cursor: pointer !important;
+  text-transform: none !important;
+  letter-spacing: 0 !important;
+  font-weight: 500 !important;
+  font-size: 12px !important;
+  color: #1a0e05 !important;
+  -webkit-text-fill-color: #1a0e05 !important;
+  white-space: nowrap !important;
+  overflow: hidden !important;
+  text-overflow: ellipsis !important;
+}
+.pf2e-cd-mer-service-form select[multiple] optgroup,
+.pf2e-cd-mer-service-dialog select[multiple] optgroup {
+  font-size: 10px !important;
+  letter-spacing: 1.5px !important;
+  text-transform: uppercase !important;
+  font-weight: 700 !important;
+  font-style: normal !important;
+  color: var(--pf2e-mer-red, #5e0000) !important;
+  -webkit-text-fill-color: var(--pf2e-mer-red, #5e0000) !important;
+  background: rgba(120, 90, 40, 0.10) !important;
+  padding: 4px 6px !important;
+}
+.pf2e-cd-mer-service-form select[multiple] option:checked,
+.pf2e-cd-mer-service-dialog select[multiple] option:checked {
+  background: linear-gradient(#5e0000, #5e0000) !important;
+  color: #f4ecd8 !important;
+  -webkit-text-fill-color: #f4ecd8 !important;
+  font-weight: 700 !important;
+}
+.pf2e-cd-mer-service-preset-hint {
+  display: block;
+  margin-top: 4px;
+  padding: 4px 8px;
+  border-radius: 2px;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.5px;
+  font-family: "Eczar", Georgia, serif;
+  background: rgba(120, 90, 40, 0.08);
+  color: var(--pf2e-mer-text, #1a0e05);
+}
+.pf2e-cd-mer-service-preset-hint[data-state="bulk"] {
+  background: rgba(94, 0, 0, 0.14);
+  color: var(--pf2e-mer-red, #5e0000);
+  font-weight: 700;
+}
+.pf2e-cd-mer-service-preset-hint[data-state="single"] {
+  background: rgba(120, 90, 40, 0.18);
+}
+.pf2e-cd-mer-disabled {
+  opacity: 0.45 !important;
+  pointer-events: none !important;
+  filter: grayscale(40%);
+}
+.pf2e-cd-mer-service-form input,
+.pf2e-cd-mer-service-form textarea,
+.pf2e-cd-mer-service-dialog input,
+.pf2e-cd-mer-service-dialog textarea {
+  color: #1a0e05 !important;
+  -webkit-text-fill-color: #1a0e05 !important;
+  opacity: 1 !important;
+  text-shadow: none !important;
+}
 .pf2e-cd-mer-service-form select option,
 .pf2e-cd-mer-service-dialog select option {
   background: #fff8e8 !important;
   color: var(--pf2e-mer-text, #1a0e05) !important;
+  font-family: "Eczar", Georgia, serif !important;
+  font-weight: 400 !important;
+  padding: 4px 8px !important;
+}
+.pf2e-cd-mer-service-form select option:checked,
+.pf2e-cd-mer-service-form select option:hover,
+.pf2e-cd-mer-service-dialog select option:checked,
+.pf2e-cd-mer-service-dialog select option:hover {
+  background: linear-gradient(#f4ecd8, #f4ecd8) !important;
+  color: var(--pf2e-mer-red, #5e0000) !important;
+}
+.pf2e-cd-mer-service-form select optgroup,
+.pf2e-cd-mer-service-dialog select optgroup {
+  background: #f4ecd8 !important;
+  color: var(--pf2e-mer-red, #5e0000) !important;
+  font-style: normal !important;
+  font-weight: 700 !important;
+  letter-spacing: 1px !important;
+  text-transform: uppercase !important;
 }
 .pf2e-cd-mer-service-form textarea::placeholder,
 .pf2e-cd-mer-service-form input::placeholder,
@@ -2834,8 +2973,18 @@ dialog.pf2e-cd-mer-qty-dialog,
 .pf2e-cd-mer-service-dialog input::placeholder {
   color: rgba(50, 25, 10, 0.45) !important;
 }
-.pf2e-cd-mer-service-form textarea { resize: vertical; min-height: 60px; }
+.pf2e-cd-mer-service-form textarea { resize: vertical; min-height: 90px; width: 100%; box-sizing: border-box; }
+.pf2e-cd-mer-service-form input,
+.pf2e-cd-mer-service-form select {
+  width: 100%;
+  box-sizing: border-box;
+}
 .pf2e-cd-mer-service-form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.pf2e-cd-mer-service-form-row select:not([multiple]) {
+  padding-right: 28px !important;
+  font-size: 12px !important;
+  letter-spacing: 0 !important;
+}
 .pf2e-cd-mer-service-form fieldset {
   border: 1px solid var(--pf2e-mer-gold, #785a28); border-radius: 3px; padding: 8px 10px;
 }

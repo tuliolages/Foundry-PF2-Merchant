@@ -439,6 +439,8 @@ export class MerchantWindow {
     if (svcBuy) { e.stopPropagation(); this._handleBuyService(svcBuy.dataset.serviceId); return; }
     const svcAdd = e.target.closest("[data-action=service-add]");
     if (svcAdd) { e.stopPropagation(); this._handleServiceEdit(null); return; }
+    const svcClear = e.target.closest("[data-action=service-clear-all]");
+    if (svcClear) { e.stopPropagation(); this._handleServiceClearAll(); return; }
     const svcEdit = e.target.closest("[data-action=service-edit]");
     if (svcEdit) { e.stopPropagation(); this._handleServiceEdit(svcEdit.dataset.serviceId); return; }
     const svcDel = e.target.closest("[data-action=service-delete]");
@@ -845,14 +847,35 @@ export class MerchantWindow {
     }
     this.refs.empty.hidden = true;
 
-    const gmAddRow = game.user.isGM ? `
-      <button type="button" class="pf2e-cd-mer-service-add" data-action="service-add">
-        <i class="fa-solid fa-circle-plus"></i>
-        <span>${escapeHTML(game.i18n.localize("PF2E_CINEMATIC_MERCHANT.service.add"))}</span>
-      </button>` : "";
+    const gmToolbar = game.user.isGM ? `
+      <div class="pf2e-cd-mer-service-toolbar">
+        <button type="button" class="pf2e-cd-mer-service-add" data-action="service-add">
+          <i class="fa-solid fa-circle-plus"></i>
+          <span>${escapeHTML(game.i18n.localize("PF2E_CINEMATIC_MERCHANT.service.add"))}</span>
+        </button>
+        ${services.length > 0 ? `
+          <button type="button" class="pf2e-cd-mer-service-clear" data-action="service-clear-all" title="${escapeHTML(game.i18n.localize("PF2E_CINEMATIC_MERCHANT.service.clearAll"))}">
+            <i class="fa-solid fa-trash-can"></i>
+            <span>${escapeHTML(game.i18n.localize("PF2E_CINEMATIC_MERCHANT.service.clearAll"))}</span>
+          </button>` : ""}
+      </div>` : "";
 
     const rows = services.map(s => this._renderServiceRow(s)).join("");
-    this.refs.itemList.innerHTML = gmAddRow + rows;
+    this.refs.itemList.innerHTML = gmToolbar + rows;
+  }
+
+  async _handleServiceClearAll() {
+    if (!game.user.isGM || !this.actor) return;
+    const services = getMerchantServices(this.actor);
+    if (services.length === 0) return;
+    const ok = await confirmDialog(
+      game.i18n.localize("PF2E_CINEMATIC_MERCHANT.service.clearAll"),
+      game.i18n.format("PF2E_CINEMATIC_MERCHANT.service.confirmClearAll", { count: services.length })
+    );
+    if (!ok) return;
+    await this.actor.update({ [`flags.${MODULE_ID}.services`]: [] });
+    ui.notifications?.info(game.i18n.format("PF2E_CINEMATIC_MERCHANT.service.cleared", { count: services.length }));
+    this._renderItems();
   }
 
   _renderServiceRow(s) {
@@ -962,10 +985,6 @@ export class MerchantWindow {
       this._showTransactionPopup({
         kind: "buy", name: s.name, img: s.img, qty: 1, price: formatCopper(priceCp),
       });
-      ChatMessage.create({
-        speaker: ChatMessage.getSpeaker({ actor: this.viewer }),
-        content: `<div class="pf2e-cd-mer-chat-buy"><strong>${escapeHTML(this.viewer.name)}</strong> ${game.i18n.localize("PF2E_CINEMATIC_MERCHANT.service.paidFor")} <strong>${escapeHTML(s.name)}</strong> ${game.i18n.localize("PF2E_CINEMATIC_MERCHANT.chat.from")} <em>${escapeHTML(this.actor.name)}</em>${priceCp > 0 ? ` ${game.i18n.localize("PF2E_CINEMATIC_MERCHANT.chat.for")} ${escapeHTML(formatCopper(priceCp))}` : ""}.${s.description ? `<div class="pf2e-cd-mer-chat-flavor">${escapeHTML(s.description)}</div>` : ""}</div>`,
-      });
     } catch (err) {
       console.warn(`${MODULE_ID} | service purchase failed:`, err);
       ui.notifications?.error(game.i18n.localize("PF2E_CINEMATIC_MERCHANT.warn.buyFailed"));
@@ -995,22 +1014,24 @@ export class MerchantWindow {
         const opts = list.map((p, idx) => {
           const i = SERVICE_PRESETS.indexOf(p);
           const priceTag = p.priceRaw ? ` — ${p.priceRaw}` : "";
-          return `<option value="${i}">${escapeHTML(p.name)}${escapeHTML(priceTag)}</option>`;
+          const full = `${p.name}${priceTag}`;
+          return `<option value="${i}" title="${escapeHTML(full)}">${escapeHTML(full)}</option>`;
         }).join("");
         return `<optgroup label="${escapeHTML(sc)}">${opts}</optgroup>`;
       }).join("");
 
     const presetSelect = existing ? "" : `
       <label>${game.i18n.localize("PF2E_CINEMATIC_MERCHANT.service.field.preset")}
-        <select name="svc-preset">
-          <option value="">${escapeHTML(game.i18n.localize("PF2E_CINEMATIC_MERCHANT.service.preset.custom"))}</option>
+        <select name="svc-preset" multiple size="10">
           ${presetOptions}
         </select>
+        <small class="pf2e-cd-mer-service-preset-hint" data-state="custom">${escapeHTML(game.i18n.localize("PF2E_CINEMATIC_MERCHANT.service.preset.hintCustom"))}</small>
       </label>
     `;
 
     await DialogV2.prompt({
       window: { title: game.i18n.localize(titleKey) },
+      position: { width: existing ? 480 : 620 },
       content: `
         <form class="pf2e-cd-mer-service-form">
           ${presetSelect}
@@ -1049,12 +1070,31 @@ export class MerchantWindow {
         const root = dialog?.element instanceof HTMLElement ? dialog.element : dialog?.element?.[0];
         const sel = root?.querySelector("[name=svc-preset]");
         if (!sel) return;
+        const hint = root.querySelector(".pf2e-cd-mer-service-preset-hint");
+        const set = (n, v) => { const el = root.querySelector(`[name=${n}]`); if (el) el.value = String(v); };
+        const customFields = root.querySelectorAll(".pf2e-cd-mer-service-form > label:not(:first-child), .pf2e-cd-mer-service-form > .pf2e-cd-mer-service-form-row, .pf2e-cd-mer-service-form > fieldset");
+        const updateHint = () => {
+          const selected = Array.from(sel.selectedOptions).map(o => Number(o.value)).filter(n => Number.isFinite(n) && n >= 0);
+          if (!hint) return selected;
+          if (selected.length === 0) {
+            hint.dataset.state = "custom";
+            hint.textContent = game.i18n.localize("PF2E_CINEMATIC_MERCHANT.service.preset.hintCustom");
+          } else if (selected.length === 1) {
+            hint.dataset.state = "single";
+            hint.textContent = game.i18n.localize("PF2E_CINEMATIC_MERCHANT.service.preset.hintSingle");
+          } else {
+            hint.dataset.state = "bulk";
+            hint.textContent = game.i18n.format("PF2E_CINEMATIC_MERCHANT.service.preset.hintBulk", { count: selected.length });
+          }
+          customFields.forEach(el => { el.classList.toggle("pf2e-cd-mer-disabled", selected.length >= 2); });
+          return selected;
+        };
         sel.addEventListener("change", () => {
-          const idx = Number(sel.value);
-          if (!Number.isFinite(idx) || idx < 0 || idx >= SERVICE_PRESETS.length) return;
-          const p = SERVICE_PRESETS[idx];
+          const selected = updateHint();
+          if (selected.length !== 1) return;
+          const p = SERVICE_PRESETS[selected[0]];
+          if (!p) return;
           const coins = copperToCoins(p.priceCp ?? 0);
-          const set = (n, v) => { const el = root.querySelector(`[name=${n}]`); if (el) el.value = String(v); };
           set("svc-name", p.name);
           set("svc-desc", p.description ?? "");
           set("svc-level", p.level ?? 0);
@@ -1064,12 +1104,36 @@ export class MerchantWindow {
           set("svc-sp", coins.sp);
           set("svc-cp", coins.cp);
         });
+        updateHint();
       },
       ok: {
         label: game.i18n.localize("PF2E_CINEMATIC_MERCHANT.settings.save"),
         icon: "fa-solid fa-save",
         callback: async (event, button, dialog) => {
           const root = dialog?.element instanceof HTMLElement ? dialog.element : dialog?.element?.[0];
+          const sel = root?.querySelector("[name=svc-preset]");
+          const selectedPresets = sel
+            ? Array.from(sel.selectedOptions).map(o => Number(o.value)).filter(n => Number.isFinite(n) && n >= 0)
+            : [];
+          if (!existing && selectedPresets.length >= 2) {
+            let added = 0;
+            for (const i of selectedPresets) {
+              const p = SERVICE_PRESETS[i];
+              if (!p) continue;
+              await addMerchantService(this.actor, {
+                name: p.name,
+                description: p.description ?? "",
+                priceCp: Number(p.priceCp ?? 0) || 0,
+                level: Number(p.level ?? 0) || 0,
+                rarity: p.rarity ?? "common",
+                img: "icons/svg/book.svg",
+              });
+              added++;
+            }
+            ui.notifications?.info(game.i18n.format("PF2E_CINEMATIC_MERCHANT.service.preset.bulkAdded", { count: added }));
+            this._renderItems();
+            return;
+          }
           const name = String(root?.querySelector("[name=svc-name]")?.value ?? "").trim() || "Service";
           const desc = String(root?.querySelector("[name=svc-desc]")?.value ?? "");
           const level = Number(root?.querySelector("[name=svc-level]")?.value ?? 0);
