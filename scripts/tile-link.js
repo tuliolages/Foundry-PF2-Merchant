@@ -109,7 +109,14 @@ function isInsideClickArea(tile, scenePoint) {
   const uv = sceneToTileUV(tile, scenePoint);
   if (!uv) return true;
   const { u, v } = uv;
-  return u >= area.x && u <= area.x + area.w && v >= area.y && v <= area.y + area.h;
+  const inside = u >= area.x && u <= area.x + area.w && v >= area.y && v <= area.y + area.h;
+  console.log(`${MODULE_ID} | hit-area test`, {
+    tile: tile.id, area,
+    pointU: u.toFixed(3), pointV: v.toFixed(3),
+    inside,
+    doc: { x: tile.document.x, y: tile.document.y, w: tile.document.width, h: tile.document.height, rot: tile.document.rotation },
+  });
+  return inside;
 }
 
 /**
@@ -454,16 +461,38 @@ async function openLinkPicker(tileDoc) {
       ok: {
         label: game.i18n.localize("PF2E_CINEMATIC_MERCHANT.tile.linkSave"),
         icon: "fa-solid fa-link",
-        callback: (event, button, dialog) => {
+        callback: async (event, button, dialog) => {
           const root = dialog?.element instanceof HTMLElement ? dialog.element : dialog?.element?.[0];
           const select = root?.querySelector("[name=actorId]");
           const value = select?.value || null;
           const useAlpha = !!root?.querySelector("[name=useImageAlpha]")?.checked;
-          setTileMerchantActorId(tileDoc, value);
-          if (tileImgSrc) setTileClickArea(tileDoc, state.area);
-          setTileUseImageAlpha(tileDoc, useAlpha);
+          // Bundle everything into a single tileDoc.update so the three
+          // independent flag writes can't race / drop each other.
+          const updates = {};
+          if (value) {
+            updates[`flags.${MODULE_ID}.actorId`] = value;
+          } else {
+            updates[`flags.${MODULE_ID}.-=actorId`] = null;
+          }
+          if (tileImgSrc) {
+            const a = state.area;
+            const isFull = !a || (a.x <= 0 && a.y <= 0 && a.x + a.w >= 1 && a.y + a.h >= 1);
+            if (isFull) {
+              updates[`flags.${MODULE_ID}.-=clickArea`] = null;
+            } else {
+              updates[`flags.${MODULE_ID}.clickArea`] = {
+                x: Math.max(0, Math.min(1, a.x)),
+                y: Math.max(0, Math.min(1, a.y)),
+                w: Math.max(0.02, Math.min(1, a.w)),
+                h: Math.max(0.02, Math.min(1, a.h)),
+              };
+            }
+          }
+          if (useAlpha) updates[`flags.${MODULE_ID}.useImageAlpha`] = true;
+          else updates[`flags.${MODULE_ID}.-=useImageAlpha`] = null;
+          try { await tileDoc.update(updates); }
+          catch (err) { console.warn(`${MODULE_ID} | tile update failed:`, err); }
           if (value) ensureMerchantOwnership(getMerchantActor(value));
-          attachMerchantTileHandlers();
         },
       },
     });
@@ -478,12 +507,11 @@ async function openLinkPicker(tileDoc) {
       save: {
         label: game.i18n.localize("PF2E_CINEMATIC_MERCHANT.tile.linkSave"),
         icon: '<i class="fa-solid fa-link"></i>',
-        callback: (jq) => {
+        callback: async (jq) => {
           const root = jq instanceof HTMLElement ? jq : jq?.[0];
           const value = root?.querySelector("[name=actorId]")?.value || null;
-          setTileMerchantActorId(tileDoc, value);
+          await setTileMerchantActorId(tileDoc, value);
           if (value) ensureMerchantOwnership(getMerchantActor(value));
-          attachMerchantTileHandlers();
         },
       },
       cancel: { label: game.i18n.localize("PF2E_CINEMATIC_MERCHANT.tile.linkCancel") },
