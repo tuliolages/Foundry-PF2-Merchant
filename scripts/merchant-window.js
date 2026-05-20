@@ -24,6 +24,9 @@ import {
   getItemDailyOfferPct,
   setItemDailyOfferPct,
   getMerchantDailyOffers,
+  recordMerchantTransaction,
+  getMerchantTransactionLog,
+  clearMerchantTransactionLog,
   normalizeMerchantType,
   getMerchantServices,
   addMerchantService,
@@ -174,6 +177,7 @@ export class MerchantWindow {
       gmImportBtn:  root.querySelector("[data-action=gm-import]"),
       gmClearBtn:   root.querySelector("[data-action=gm-clear]"),
       gmSettingsBtn:root.querySelector("[data-action=gm-settings]"),
+      gmHistoryBtn: root.querySelector("[data-action=gm-history]"),
       portraitImg:  root.querySelector(".pf2e-cd-mer-portrait-img"),
       portraitFrame:root.querySelector(".pf2e-cd-mer-portrait-frame"),
       portraitFlip: root.querySelector(".pf2e-cd-mer-portrait-flip"),
@@ -577,6 +581,9 @@ export class MerchantWindow {
     if (this._popoutWin && !this._popoutWin.closed) {
       try { this._popoutWin.close(); } catch {}
     }
+    // Reset filters so the next open starts clean.
+    this._resetAllFilters();
+    this.viewMode = "categories";
     this.root.classList.remove("is-active");
     this.refs.frame.classList.remove("is-revealed");
     if (this._actorHookId) {
@@ -629,8 +636,25 @@ export class MerchantWindow {
     this.transactions = [];
   }
 
-  _logTransaction(kind, name, qty, cp) {
-    this.transactions.push({ kind, name, qty, cp, when: Date.now() });
+  _logTransaction(kind, name, qty, cp, opts = {}) {
+    const when = Date.now();
+    this.transactions.push({ kind, name, qty, cp, when });
+    // Best-effort persistent log on the merchant actor. Only the GM (or
+    // anyone with update perms) will succeed; players go through the relay
+    // which records server-side.
+    if (this.actor && game.user.isGM) {
+      recordMerchantTransaction(this.actor, {
+        kind,
+        characterId: this.viewer?.id ?? "",
+        characterName: this.viewer?.name ?? "—",
+        userName: game.user?.name,
+        itemName: name,
+        itemImg: opts.img ?? null,
+        qty,
+        cp,
+        when,
+      });
+    }
   }
 
   _pickViewer() {
@@ -720,6 +744,7 @@ export class MerchantWindow {
     if (this.refs.gmImportBtn)   this.refs.gmImportBtn.addEventListener("click", () => this._handleImport());
     if (this.refs.gmClearBtn)    this.refs.gmClearBtn.addEventListener("click",  () => this._handleClearAll());
     if (this.refs.gmSettingsBtn) this.refs.gmSettingsBtn.addEventListener("click", () => this._handleOpenSettings());
+    if (this.refs.gmHistoryBtn)  this.refs.gmHistoryBtn.addEventListener("click",  () => this._handleOpenHistory());
     if (this.refs.sellOpenBtn)   this.refs.sellOpenBtn.addEventListener("click",  () => this._handleOpenSellList());
 
     const debounced = this._debounce(() => this._renderItems(), 120);
@@ -1752,7 +1777,7 @@ export class MerchantWindow {
 
     await DialogV2.wait({
       window: { title: game.i18n.localize("PF2E_CINEMATIC_MERCHANT.service.preset.browseTitle") },
-      position: { width: 640, height: 640 },
+      position: { width: 640 },
       content,
       classes: ["pf2e-cd-mer-dialog", "pf2e-cd-mer-service-dialog", "pf2e-cd-mer-svc-pb-dialog"],
       buttons: [
@@ -1883,6 +1908,148 @@ export class MerchantWindow {
     });
   }
 
+  async _handleOpenHistory() {
+    if (!game.user.isGM || !this.actor) return;
+    const DialogV2 = foundry.applications?.api?.DialogV2;
+    if (!DialogV2) return;
+
+    const renderRows = (entries, filterKind, filterText) => {
+      const q = (filterText ?? "").trim().toLowerCase();
+      const filtered = entries.filter(e => {
+        if (filterKind !== "all" && e.kind !== filterKind) return false;
+        if (!q) return true;
+        return (e.itemName ?? "").toLowerCase().includes(q)
+          || (e.characterName ?? "").toLowerCase().includes(q)
+          || (e.userName ?? "").toLowerCase().includes(q);
+      });
+      if (filtered.length === 0) {
+        return `<li class="pf2e-cd-mer-hist-empty">${escapeHTML(game.i18n.localize("PF2E_CINEMATIC_MERCHANT.history.empty"))}</li>`;
+      }
+      // Newest first.
+      return filtered.slice().reverse().map(e => {
+        const when = new Date(e.when ?? 0);
+        const dateStr = when.toLocaleString();
+        const verbKey = e.kind === "sell"
+          ? "PF2E_CINEMATIC_MERCHANT.history.verbSell"
+          : "PF2E_CINEMATIC_MERCHANT.history.verbBuy";
+        const verb = game.i18n.localize(verbKey);
+        return `
+          <li class="pf2e-cd-mer-hist-row pf2e-cd-mer-hist-${e.kind}">
+            <img class="pf2e-cd-mer-hist-img" src="${escapeHTML(e.itemImg || "icons/svg/item-bag.svg")}" alt="" />
+            <div class="pf2e-cd-mer-hist-main">
+              <div class="pf2e-cd-mer-hist-row1">
+                <span class="pf2e-cd-mer-hist-verb">${escapeHTML(verb)}</span>
+                <span class="pf2e-cd-mer-hist-item">${escapeHTML(e.itemName)}</span>
+                ${e.qty > 1 ? `<span class="pf2e-cd-mer-hist-qty">×${e.qty}</span>` : ""}
+                <span class="pf2e-cd-mer-hist-price">${formatCopper(e.cp)}</span>
+              </div>
+              <div class="pf2e-cd-mer-hist-row2">
+                <span class="pf2e-cd-mer-hist-char">${escapeHTML(e.characterName || "—")}</span>
+                ${e.userName && e.userName !== e.characterName ? `<span class="pf2e-cd-mer-hist-user">(${escapeHTML(e.userName)})</span>` : ""}
+                <span class="pf2e-cd-mer-hist-when" title="${escapeHTML(dateStr)}">${escapeHTML(this._formatRelativeTime(when))}</span>
+              </div>
+            </div>
+          </li>
+        `;
+      }).join("");
+    };
+
+    const computeTotals = (entries) => {
+      let totalBuy = 0, totalSell = 0;
+      for (const e of entries) {
+        if (e.kind === "buy") totalBuy += Number(e.cp) || 0;
+        else if (e.kind === "sell") totalSell += Number(e.cp) || 0;
+      }
+      return { totalBuy, totalSell };
+    };
+
+    const initial = getMerchantTransactionLog(this.actor);
+    const { totalBuy, totalSell } = computeTotals(initial);
+
+    const content = `
+      <div class="pf2e-cd-mer-hist">
+        <div class="pf2e-cd-mer-hist-summary">
+          <div class="pf2e-cd-mer-hist-stat">
+            <span>${escapeHTML(game.i18n.localize("PF2E_CINEMATIC_MERCHANT.history.totalBought"))}</span>
+            <strong data-role="hist-total-buy">${formatCopper(totalBuy)}</strong>
+          </div>
+          <div class="pf2e-cd-mer-hist-stat">
+            <span>${escapeHTML(game.i18n.localize("PF2E_CINEMATIC_MERCHANT.history.totalSold"))}</span>
+            <strong data-role="hist-total-sell">${formatCopper(totalSell)}</strong>
+          </div>
+          <div class="pf2e-cd-mer-hist-stat">
+            <span>${escapeHTML(game.i18n.localize("PF2E_CINEMATIC_MERCHANT.history.entries"))}</span>
+            <strong data-role="hist-count">${initial.length}</strong>
+          </div>
+        </div>
+        <div class="pf2e-cd-mer-hist-toolbar">
+          <input type="search" data-role="hist-search" placeholder="${escapeHTML(game.i18n.localize("PF2E_CINEMATIC_MERCHANT.filter.search"))}" />
+          <select data-role="hist-kind">
+            <option value="all">${escapeHTML(game.i18n.localize("PF2E_CINEMATIC_MERCHANT.history.kindAll"))}</option>
+            <option value="buy">${escapeHTML(game.i18n.localize("PF2E_CINEMATIC_MERCHANT.history.kindBuy"))}</option>
+            <option value="sell">${escapeHTML(game.i18n.localize("PF2E_CINEMATIC_MERCHANT.history.kindSell"))}</option>
+          </select>
+          <button type="button" class="pf2e-cd-mer-hist-clear-btn" data-action="hist-clear">
+            <i class="fa-solid fa-trash-can"></i>
+            <span>${escapeHTML(game.i18n.localize("PF2E_CINEMATIC_MERCHANT.history.clear"))}</span>
+          </button>
+        </div>
+        <ul class="pf2e-cd-mer-hist-list" data-role="hist-list"></ul>
+      </div>
+    `;
+
+    await DialogV2.wait({
+      window: { title: game.i18n.format("PF2E_CINEMATIC_MERCHANT.history.title", { actor: this.actor.name }) },
+      position: { width: 640 },
+      content,
+      classes: ["pf2e-cd-mer-dialog", "pf2e-cd-mer-history-dialog"],
+      buttons: [{ action: "close", label: game.i18n.localize("PF2E_CINEMATIC_MERCHANT.window.close"), default: true }],
+      render: (event, dialog) => {
+        const root = dialog?.element instanceof HTMLElement ? dialog.element : dialog?.element?.[0];
+        if (!root) return;
+        const listEl = root.querySelector("[data-role=hist-list]");
+        const searchEl = root.querySelector("[data-role=hist-search]");
+        const kindEl = root.querySelector("[data-role=hist-kind]");
+        const clearBtn = root.querySelector("[data-action=hist-clear]");
+
+        let state = { kind: "all", text: "" };
+        const repaint = () => {
+          const entries = getMerchantTransactionLog(this.actor);
+          listEl.innerHTML = renderRows(entries, state.kind, state.text);
+          const totals = computeTotals(entries);
+          root.querySelector("[data-role=hist-total-buy]").textContent = formatCopper(totals.totalBuy);
+          root.querySelector("[data-role=hist-total-sell]").textContent = formatCopper(totals.totalSell);
+          root.querySelector("[data-role=hist-count]").textContent = String(entries.length);
+        };
+        searchEl?.addEventListener("input", () => { state.text = searchEl.value; repaint(); });
+        kindEl?.addEventListener("change", () => { state.kind = kindEl.value; repaint(); });
+        clearBtn?.addEventListener("click", async () => {
+          const ok = await confirmDialog(
+            game.i18n.localize("PF2E_CINEMATIC_MERCHANT.history.clear"),
+            game.i18n.localize("PF2E_CINEMATIC_MERCHANT.history.clearConfirm")
+          );
+          if (!ok) return;
+          await clearMerchantTransactionLog(this.actor);
+          repaint();
+        });
+        repaint();
+      },
+    });
+  }
+
+  _formatRelativeTime(date) {
+    const now = Date.now();
+    const diff = now - (date?.getTime?.() ?? now);
+    if (diff < 60_000) return game.i18n.localize("PF2E_CINEMATIC_MERCHANT.history.justNow");
+    const mins = Math.floor(diff / 60_000);
+    if (mins < 60) return game.i18n.format("PF2E_CINEMATIC_MERCHANT.history.minsAgo", { n: mins });
+    const hours = Math.floor(mins / 60);
+    if (hours < 24) return game.i18n.format("PF2E_CINEMATIC_MERCHANT.history.hoursAgo", { n: hours });
+    const days = Math.floor(hours / 24);
+    if (days < 30) return game.i18n.format("PF2E_CINEMATIC_MERCHANT.history.daysAgo", { n: days });
+    return date.toLocaleDateString();
+  }
+
   async _handleServiceDelete(serviceId) {
     if (!game.user.isGM || !this.actor) return;
     const services = getMerchantServices(this.actor);
@@ -1968,7 +2135,42 @@ export class MerchantWindow {
     }
   }
 
+  /** Reset every filter to its default and clear the matching UI controls. */
+  _resetAllFilters() {
+    this.filters.search = "";
+    this.filters.category = "all";
+    this.filters.rarity = "all";
+    this.filters.levelMin = null;
+    this.filters.levelMax = null;
+    this.filters.affordableOnly = false;
+    this.filters.sort = "default";
+    this.filters.wishlistOnly = false;
+    this.filters.usage = "all";
+    this.filters.group = "all";
+    this.filters.bulk = "all";
+    this.filters.magical = "all";
+    if (this.refs.search) this.refs.search.value = "";
+    if (this.refs.raritySel) this.refs.raritySel.value = "all";
+    if (this.refs.levelMin) this.refs.levelMin.value = "";
+    if (this.refs.levelMax) this.refs.levelMax.value = "";
+    if (this.refs.sortSel) this.refs.sortSel.value = "default";
+    if (this.refs.affordableCb) this.refs.affordableCb.checked = false;
+    if (this.refs.wishlistCb) this.refs.wishlistCb.checked = false;
+    if (this.refs.usageSel) this.refs.usageSel.value = "all";
+    if (this.refs.groupSel) this.refs.groupSel.value = "all";
+    if (this.refs.bulkSel) this.refs.bulkSel.value = "all";
+    if (this.refs.magicalSel) this.refs.magicalSel.value = "all";
+    // Collapse the advanced-filters section too.
+    if (this.refs.filtersAdv) this.refs.filtersAdv.hidden = true;
+    if (this.refs.filtersBar) this.refs.filtersBar.classList.add("is-collapsed");
+    const chev = this.refs.filtersToggleBtn?.querySelector("i");
+    if (chev) chev.className = "fa-solid fa-chevron-down";
+  }
+
   _enterCategory(cat) {
+    // Each new category starts with a clean slate — no leftover search /
+    // rarity / level filters from the previous browse.
+    this._resetAllFilters();
     if (cat === "__wishlist") {
       this.filters.category = "all";
       this.filters.wishlistOnly = true;
@@ -1979,8 +2181,6 @@ export class MerchantWindow {
       return;
     } else {
       this.filters.category = cat;
-      this.filters.wishlistOnly = false;
-      if (this.refs.wishlistCb) this.refs.wishlistCb.checked = false;
     }
     this.viewMode = "items";
     this._renderItems();
@@ -1988,17 +2188,7 @@ export class MerchantWindow {
 
   _goBackToCategories() {
     this.viewMode = "categories";
-    this.filters.category = "all";
-    this.filters.search = "";
-    this.filters.rarity = "all";
-    this.filters.levelMin = null;
-    this.filters.levelMax = null;
-    this.filters.wishlistOnly = false;
-    if (this.refs.search) this.refs.search.value = "";
-    if (this.refs.raritySel) this.refs.raritySel.value = "all";
-    if (this.refs.levelMin) this.refs.levelMin.value = "";
-    if (this.refs.levelMax) this.refs.levelMax.value = "";
-    if (this.refs.wishlistCb) this.refs.wishlistCb.checked = false;
+    this._resetAllFilters();
     this._renderItems();
   }
 
@@ -2656,6 +2846,10 @@ export class MerchantWindow {
               <button type="button" data-action="gm-settings">
                 <i class="fa-solid fa-sliders"></i>
                 <span>${game.i18n.localize("PF2E_CINEMATIC_MERCHANT.gm.settingsBtn")}</span>
+              </button>
+              <button type="button" data-action="gm-history">
+                <i class="fa-solid fa-clock-rotate-left"></i>
+                <span>${game.i18n.localize("PF2E_CINEMATIC_MERCHANT.gm.historyBtn")}</span>
               </button>
               <button type="button" data-action="gm-clear">
                 <i class="fa-solid fa-trash-can"></i>

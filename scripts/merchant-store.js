@@ -507,6 +507,55 @@ export function effectiveSellRate(merchant, viewer = null) {
   return Math.max(0, base * (1 + disc));
 }
 
+// === Per-merchant transaction history ====================================
+// Stored as flag `transactionLog` (array, newest last). Capped to keep flag
+// storage reasonable — older entries fall off the front.
+
+const MAX_TRANSACTION_LOG = 500;
+
+export function getMerchantTransactionLog(actor) {
+  const v = actor?.flags?.[MODULE_ID]?.transactionLog;
+  if (!Array.isArray(v)) return [];
+  return v;
+}
+
+/**
+ * Append a single transaction record. Best-effort — silently no-ops if the
+ * user lacks update permission so it never blocks the actual buy/sell flow.
+ * @param {Actor} merchant
+ * @param {object} entry  { kind, characterId, characterName, itemName, itemImg, qty, cp, when }
+ */
+export async function recordMerchantTransaction(merchant, entry) {
+  if (!merchant || !entry) return;
+  const log = getMerchantTransactionLog(merchant);
+  const clean = {
+    kind: entry.kind === "sell" ? "sell" : "buy",
+    characterId: String(entry.characterId ?? ""),
+    characterName: String(entry.characterName ?? "—"),
+    userName: String(entry.userName ?? game.user?.name ?? ""),
+    itemName: String(entry.itemName ?? "—"),
+    itemImg: String(entry.itemImg ?? "icons/svg/item-bag.svg"),
+    qty: Math.max(1, Number(entry.qty) || 1),
+    cp: Math.max(0, Number(entry.cp) || 0),
+    when: Number(entry.when) || Date.now(),
+  };
+  const next = [...log, clean];
+  // Cap by trimming the front (oldest) so newest stays.
+  if (next.length > MAX_TRANSACTION_LOG) next.splice(0, next.length - MAX_TRANSACTION_LOG);
+  try {
+    await merchant.update({ [`flags.${MODULE_ID}.transactionLog`]: next });
+  } catch (err) {
+    // Common case: player lacks update permission on the loot actor when
+    // the GM-relay path is being used. The GM-side handler will record it.
+    console.debug(`${MODULE_ID} | transaction log update skipped:`, err?.message);
+  }
+}
+
+export async function clearMerchantTransactionLog(merchant) {
+  if (!merchant) return;
+  return merchant.update({ [`flags.${MODULE_ID}.-=transactionLog`]: null });
+}
+
 /** Per-item daily-offer discount, 0..0.95. Returns 0 if not set. */
 export function getItemDailyOfferPct(item) {
   const v = Number(item?.flags?.[ITEM_FLAG_SCOPE]?.dailyOfferPct);

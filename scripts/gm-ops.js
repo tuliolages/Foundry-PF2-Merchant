@@ -10,6 +10,7 @@ import {
   getMerchantSellRate,
   setMerchantCoins,
   readMerchantCoins,
+  recordMerchantTransaction,
 } from "./merchant-store.js";
 import { registerHandler } from "./socket-bridge.js";
 
@@ -72,6 +73,12 @@ export function registerGMHandlers() {
     } else {
       await item.delete();
     }
+    await recordMerchantTransaction(merchant, {
+      kind: "buy",
+      characterId: viewer.id, characterName: viewer.name,
+      itemName: item.name, itemImg: item.img,
+      qty: buyQty, cp: totalCp,
+    });
     return { ok: true, totalCp, qty: buyQty, name: item.name };
   });
 
