@@ -90,6 +90,13 @@
   "PF2E_CINEMATIC_MERCHANT.service.preset.hintSingle": "1 preset selected — fields below pre-filled, you can still tweak them.",
   "PF2E_CINEMATIC_MERCHANT.service.preset.hintBulk": "{count} presets selected — all will be added at once with their original SRD values. Fields below are ignored.",
   "PF2E_CINEMATIC_MERCHANT.service.preset.bulkAdded": "Added {count} services from presets.",
+  "PF2E_CINEMATIC_MERCHANT.service.preset.browseBtn": "Browse presets…",
+  "PF2E_CINEMATIC_MERCHANT.service.preset.browseTitle": "Pick SRD presets",
+  "PF2E_CINEMATIC_MERCHANT.service.preset.browseCount": "{shown} visible · {selected} selected",
+  "PF2E_CINEMATIC_MERCHANT.service.preset.applyOne": "Use in form",
+  "PF2E_CINEMATIC_MERCHANT.service.preset.bulkAddBtn": "Add selected",
+  "PF2E_CINEMATIC_MERCHANT.service.preset.applyOneNoSel": "Please select at least one preset.",
+  "PF2E_CINEMATIC_MERCHANT.service.preset.applyOneTooMany": "\"Use in form\" only works with a single selection. Use \"Add selected\" for multiple.",
 
   "PF2E_CINEMATIC_MERCHANT.rarity.all": "Any rarity",
   "PF2E_CINEMATIC_MERCHANT.rarity.common": "Common",

@@ -90,6 +90,13 @@
   "PF2E_CINEMATIC_MERCHANT.service.preset.hintSingle": "1 Vorlage gewählt — Felder unten sind vorausgefüllt, du kannst sie noch anpassen.",
   "PF2E_CINEMATIC_MERCHANT.service.preset.hintBulk": "{count} Vorlagen gewählt — alle werden mit den Original-SRD-Werten angelegt. Felder unten werden ignoriert.",
   "PF2E_CINEMATIC_MERCHANT.service.preset.bulkAdded": "{count} Dienste aus Vorlagen hinzugefügt.",
+  "PF2E_CINEMATIC_MERCHANT.service.preset.browseBtn": "Vorlagen durchsuchen…",
+  "PF2E_CINEMATIC_MERCHANT.service.preset.browseTitle": "SRD-Vorlagen auswählen",
+  "PF2E_CINEMATIC_MERCHANT.service.preset.browseCount": "{shown} sichtbar · {selected} ausgewählt",
+  "PF2E_CINEMATIC_MERCHANT.service.preset.applyOne": "Ins Formular übernehmen",
+  "PF2E_CINEMATIC_MERCHANT.service.preset.bulkAddBtn": "Ausgewählte hinzufügen",
+  "PF2E_CINEMATIC_MERCHANT.service.preset.applyOneNoSel": "Bitte wähle mindestens eine Vorlage aus.",
+  "PF2E_CINEMATIC_MERCHANT.service.preset.applyOneTooMany": "„Ins Formular übernehmen\" funktioniert nur bei genau einer Auswahl. Nutze „Ausgewählte hinzufügen\" für mehrere.",
 
   "PF2E_CINEMATIC_MERCHANT.rarity.all": "Beliebige Seltenheit",
   "PF2E_CINEMATIC_MERCHANT.rarity.common": "Allgemein",

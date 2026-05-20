@@ -1559,36 +1559,11 @@ export class MerchantWindow {
       ? "PF2E_CINEMATIC_MERCHANT.service.editTitle"
       : "PF2E_CINEMATIC_MERCHANT.service.addTitle";
 
-    // Group presets by subcategory for an organized <optgroup> dropdown.
-    const presetGroups = {};
-    for (const p of SERVICE_PRESETS) {
-      const sc = p.subcategory || game.i18n.localize("PF2E_CINEMATIC_MERCHANT.service.preset.uncategorized");
-      (presetGroups[sc] ??= []).push(p);
-    }
-    const presetOptions = existing ? "" : Object.entries(presetGroups)
-      .sort(([a], [b]) => a.localeCompare(b))
-      .map(([sc, list]) => {
-        const opts = list.map((p, idx) => {
-          const i = SERVICE_PRESETS.indexOf(p);
-          const priceTag = p.priceRaw ? ` — ${p.priceRaw}` : "";
-          const full = `${p.name}${priceTag}`;
-          return `<option value="${i}" title="${escapeHTML(full)}">${escapeHTML(full)}</option>`;
-        }).join("");
-        return `<optgroup label="${escapeHTML(sc)}">${opts}</optgroup>`;
-      }).join("");
-
     const presetSection = existing ? "" : `
-      <details class="pf2e-cd-mer-service-presets" data-role="svc-presets">
-        <summary>
-          <i class="fa-solid fa-list-check"></i>
-          <span>${escapeHTML(game.i18n.localize("PF2E_CINEMATIC_MERCHANT.service.field.preset"))}</span>
-          <small class="pf2e-cd-mer-service-preset-hint" data-state="custom">${escapeHTML(game.i18n.localize("PF2E_CINEMATIC_MERCHANT.service.preset.hintCustom"))}</small>
-        </summary>
-        <input type="search" class="pf2e-cd-mer-service-preset-search" data-role="svc-preset-search" placeholder="${escapeHTML(game.i18n.localize("PF2E_CINEMATIC_MERCHANT.filter.search"))}" />
-        <select name="svc-preset" multiple size="8">
-          ${presetOptions}
-        </select>
-      </details>
+      <button type="button" class="pf2e-cd-mer-service-preset-btn" data-action="open-preset-browser">
+        <i class="fa-solid fa-list-check"></i>
+        <span>${escapeHTML(game.i18n.localize("PF2E_CINEMATIC_MERCHANT.service.preset.browseBtn"))}</span>
+      </button>
     `;
 
     const initialImg = existing?.img ?? "icons/svg/book.svg";
@@ -1665,86 +1640,46 @@ export class MerchantWindow {
             },
           }).render(true);
         });
-        // Preset-list search filter
-        const searchInput = root.querySelector("[data-role=svc-preset-search]");
-        const sel = root?.querySelector("[name=svc-preset]");
-        searchInput?.addEventListener("input", () => {
-          if (!sel) return;
-          const q = searchInput.value.trim().toLowerCase();
-          for (const opt of sel.querySelectorAll("option")) {
-            opt.hidden = !!q && !opt.textContent.toLowerCase().includes(q);
-          }
-          for (const grp of sel.querySelectorAll("optgroup")) {
-            const anyVisible = [...grp.querySelectorAll("option")].some(o => !o.hidden);
-            grp.hidden = !anyVisible;
-          }
-        });
-        if (!sel) return;
-        const hint = root.querySelector(".pf2e-cd-mer-service-preset-hint");
+        // Browse-preset button → opens dedicated preset browser dialog
+        const presetBtn = root.querySelector("[data-action=open-preset-browser]");
         const set = (n, v) => { const el = root.querySelector(`[name=${n}]`); if (el) el.value = String(v); };
-        const customFields = root.querySelectorAll(".pf2e-cd-mer-service-form-grid");
-        const updateHint = () => {
-          const selected = Array.from(sel.selectedOptions).map(o => Number(o.value)).filter(n => Number.isFinite(n) && n >= 0);
-          if (!hint) return selected;
-          if (selected.length === 0) {
-            hint.dataset.state = "custom";
-            hint.textContent = game.i18n.localize("PF2E_CINEMATIC_MERCHANT.service.preset.hintCustom");
-          } else if (selected.length === 1) {
-            hint.dataset.state = "single";
-            hint.textContent = game.i18n.localize("PF2E_CINEMATIC_MERCHANT.service.preset.hintSingle");
-          } else {
-            hint.dataset.state = "bulk";
-            hint.textContent = game.i18n.format("PF2E_CINEMATIC_MERCHANT.service.preset.hintBulk", { count: selected.length });
-          }
-          customFields.forEach(el => { el.classList.toggle("pf2e-cd-mer-disabled", selected.length >= 2); });
-          return selected;
-        };
-        sel.addEventListener("change", () => {
-          const selected = updateHint();
-          if (selected.length !== 1) return;
-          const p = SERVICE_PRESETS[selected[0]];
-          if (!p) return;
-          const coins = copperToCoins(p.priceCp ?? 0);
-          set("svc-name", p.name);
-          set("svc-desc", p.description ?? "");
-          set("svc-level", p.level ?? 0);
-          set("svc-rarity", p.rarity ?? "common");
-          set("svc-pp", coins.pp);
-          set("svc-gp", coins.gp);
-          set("svc-sp", coins.sp);
-          set("svc-cp", coins.cp);
-          syncImg();
+        presetBtn?.addEventListener("click", () => {
+          this._openServicePresetBrowser({
+            onApplyOne: (p) => {
+              const c = copperToCoins(p.priceCp ?? 0);
+              set("svc-name", p.name);
+              set("svc-desc", p.description ?? "");
+              set("svc-level", p.level ?? 0);
+              set("svc-rarity", p.rarity ?? "common");
+              set("svc-pp", c.pp); set("svc-gp", c.gp); set("svc-sp", c.sp); set("svc-cp", c.cp);
+              syncImg();
+            },
+            onBulkAdd: async (presets) => {
+              let added = 0;
+              for (const p of presets) {
+                await addMerchantService(this.actor, {
+                  name: p.name,
+                  description: p.description ?? "",
+                  priceCp: Number(p.priceCp ?? 0) || 0,
+                  level: Number(p.level ?? 0) || 0,
+                  rarity: p.rarity ?? "common",
+                  img: "icons/svg/book.svg",
+                });
+                added++;
+              }
+              ui.notifications?.info(game.i18n.format("PF2E_CINEMATIC_MERCHANT.service.preset.bulkAdded", { count: added }));
+              this._renderItems();
+              // Close the new-service dialog since we just bulk-added.
+              dialog?.close?.();
+            },
+          });
         });
-        updateHint();
       },
       ok: {
         label: game.i18n.localize("PF2E_CINEMATIC_MERCHANT.settings.save"),
         icon: "fa-solid fa-save",
         callback: async (event, button, dialog) => {
           const root = dialog?.element instanceof HTMLElement ? dialog.element : dialog?.element?.[0];
-          const sel = root?.querySelector("[name=svc-preset]");
-          const selectedPresets = sel
-            ? Array.from(sel.selectedOptions).map(o => Number(o.value)).filter(n => Number.isFinite(n) && n >= 0)
-            : [];
-          if (!existing && selectedPresets.length >= 2) {
-            let added = 0;
-            for (const i of selectedPresets) {
-              const p = SERVICE_PRESETS[i];
-              if (!p) continue;
-              await addMerchantService(this.actor, {
-                name: p.name,
-                description: p.description ?? "",
-                priceCp: Number(p.priceCp ?? 0) || 0,
-                level: Number(p.level ?? 0) || 0,
-                rarity: p.rarity ?? "common",
-                img: "icons/svg/book.svg",
-              });
-              added++;
-            }
-            ui.notifications?.info(game.i18n.format("PF2E_CINEMATIC_MERCHANT.service.preset.bulkAdded", { count: added }));
-            this._renderItems();
-            return;
-          }
           const name = String(root?.querySelector("[name=svc-name]")?.value ?? "").trim() || "Service";
           const desc = String(root?.querySelector("[name=svc-desc]")?.value ?? "");
           const level = Number(root?.querySelector("[name=svc-level]")?.value ?? 0);
@@ -1762,6 +1697,188 @@ export class MerchantWindow {
           }
           this._renderItems();
         },
+      },
+    });
+  }
+
+  async _openServicePresetBrowser({ onApplyOne, onBulkAdd }) {
+    const DialogV2 = foundry.applications?.api?.DialogV2;
+    if (!DialogV2) return;
+
+    // Group presets by subcategory for filter chips.
+    const subcats = new Set();
+    for (const p of SERVICE_PRESETS) {
+      if (p.subcategory) subcats.add(p.subcategory);
+    }
+    const subcatList = [...subcats].sort((a, b) => a.localeCompare(b));
+
+    const chips = subcatList.map(sc =>
+      `<button type="button" class="pf2e-cd-mer-svc-pb-chip is-active" data-cat="${escapeHTML(sc)}">${escapeHTML(sc)}</button>`
+    ).join("");
+
+    const content = `
+      <div class="pf2e-cd-mer-svc-pb">
+        <div class="pf2e-cd-mer-svc-pb-toolbar">
+          <input type="search" class="pf2e-cd-mer-svc-pb-search" data-role="svc-pb-search" placeholder="${escapeHTML(game.i18n.localize("PF2E_CINEMATIC_MERCHANT.filter.search"))}" />
+          <span class="pf2e-cd-mer-svc-pb-count" data-role="svc-pb-count"></span>
+        </div>
+        <div class="pf2e-cd-mer-svc-pb-chips">
+          <button type="button" class="pf2e-cd-mer-svc-pb-chip-toggle" data-action="svc-pb-cat-all">${escapeHTML(game.i18n.localize("PF2E_CINEMATIC_MERCHANT.picker.allCats"))}</button>
+          <button type="button" class="pf2e-cd-mer-svc-pb-chip-toggle" data-action="svc-pb-cat-none">${escapeHTML(game.i18n.localize("PF2E_CINEMATIC_MERCHANT.picker.noCats"))}</button>
+          ${chips}
+        </div>
+        <div class="pf2e-cd-mer-svc-pb-actions">
+          <button type="button" data-action="svc-pb-select-visible"><i class="fa-solid fa-check-double"></i> ${escapeHTML(game.i18n.localize("PF2E_CINEMATIC_MERCHANT.picker.selectAll"))}</button>
+          <button type="button" data-action="svc-pb-select-none"><i class="fa-solid fa-eraser"></i> ${escapeHTML(game.i18n.localize("PF2E_CINEMATIC_MERCHANT.picker.selectNone"))}</button>
+        </div>
+        <ul class="pf2e-cd-mer-svc-pb-list" data-role="svc-pb-list"></ul>
+      </div>
+    `;
+
+    const state = {
+      search: "",
+      activeCats: new Set(subcatList),
+      selected: new Set(), // indices into SERVICE_PRESETS
+    };
+
+    const visiblePresets = () => SERVICE_PRESETS
+      .map((p, idx) => ({ p, idx }))
+      .filter(({ p }) => {
+        if (state.search && !p.name.toLowerCase().includes(state.search)) return false;
+        const sc = p.subcategory ?? "";
+        if (sc && !state.activeCats.has(sc)) return false;
+        return true;
+      });
+
+    await DialogV2.wait({
+      window: { title: game.i18n.localize("PF2E_CINEMATIC_MERCHANT.service.preset.browseTitle") },
+      position: { width: 640, height: 640 },
+      content,
+      classes: ["pf2e-cd-mer-dialog", "pf2e-cd-mer-service-dialog", "pf2e-cd-mer-svc-pb-dialog"],
+      buttons: [
+        {
+          action: "apply-one",
+          label: game.i18n.localize("PF2E_CINEMATIC_MERCHANT.service.preset.applyOne"),
+          icon: "fa-solid fa-arrow-down-to-line",
+          default: false,
+          callback: (event, button, dialog) => {
+            const root = dialog?.element instanceof HTMLElement ? dialog.element : dialog?.element?.[0];
+            const idx = [...state.selected][0];
+            const p = SERVICE_PRESETS[idx];
+            if (!p) {
+              ui.notifications?.warn(game.i18n.localize("PF2E_CINEMATIC_MERCHANT.service.preset.applyOneNoSel"));
+              return false;
+            }
+            if (state.selected.size > 1) {
+              ui.notifications?.warn(game.i18n.localize("PF2E_CINEMATIC_MERCHANT.service.preset.applyOneTooMany"));
+              return false;
+            }
+            onApplyOne?.(p);
+          },
+        },
+        {
+          action: "bulk-add",
+          label: game.i18n.localize("PF2E_CINEMATIC_MERCHANT.service.preset.bulkAddBtn"),
+          icon: "fa-solid fa-plus",
+          default: true,
+          callback: async (event, button, dialog) => {
+            if (state.selected.size === 0) {
+              ui.notifications?.warn(game.i18n.localize("PF2E_CINEMATIC_MERCHANT.service.preset.applyOneNoSel"));
+              return false;
+            }
+            const presets = [...state.selected].map(i => SERVICE_PRESETS[i]).filter(Boolean);
+            await onBulkAdd?.(presets);
+          },
+        },
+        { action: "cancel", label: game.i18n.localize("PF2E_CINEMATIC_MERCHANT.tile.linkCancel") },
+      ],
+      render: (event, dialog) => {
+        const root = dialog?.element instanceof HTMLElement ? dialog.element : dialog?.element?.[0];
+        if (!root) return;
+        const listEl = root.querySelector("[data-role=svc-pb-list]");
+        const countEl = root.querySelector("[data-role=svc-pb-count]");
+        const searchEl = root.querySelector("[data-role=svc-pb-search]");
+
+        const renderList = () => {
+          const items = visiblePresets();
+          if (countEl) {
+            countEl.textContent = game.i18n.format("PF2E_CINEMATIC_MERCHANT.service.preset.browseCount", {
+              shown: items.length, selected: state.selected.size,
+            });
+          }
+          listEl.innerHTML = items.map(({ p, idx }) => {
+            const checked = state.selected.has(idx) ? "checked" : "";
+            const priceTag = p.priceRaw ? `<span class="pf2e-cd-mer-svc-pb-price">${escapeHTML(p.priceRaw)}</span>` : "";
+            const desc = p.description ? `<div class="pf2e-cd-mer-svc-pb-desc">${escapeHTML(p.description.length > 120 ? p.description.slice(0, 117) + "…" : p.description)}</div>` : "";
+            const sc = p.subcategory ? `<span class="pf2e-cd-mer-svc-pb-cat">${escapeHTML(p.subcategory)}</span>` : "";
+            return `
+              <li class="pf2e-cd-mer-svc-pb-item">
+                <label>
+                  <input type="checkbox" data-idx="${idx}" ${checked} />
+                  <div class="pf2e-cd-mer-svc-pb-item-main">
+                    <div class="pf2e-cd-mer-svc-pb-item-row1">
+                      <span class="pf2e-cd-mer-svc-pb-name">${escapeHTML(p.name)}</span>
+                      ${priceTag}
+                    </div>
+                    <div class="pf2e-cd-mer-svc-pb-item-row2">${sc}${desc}</div>
+                  </div>
+                </label>
+              </li>
+            `;
+          }).join("");
+          // Wire checkbox events
+          for (const cb of listEl.querySelectorAll("input[type=checkbox]")) {
+            cb.addEventListener("change", () => {
+              const idx = Number(cb.dataset.idx);
+              if (cb.checked) state.selected.add(idx);
+              else state.selected.delete(idx);
+              if (countEl) {
+                countEl.textContent = game.i18n.format("PF2E_CINEMATIC_MERCHANT.service.preset.browseCount", {
+                  shown: visiblePresets().length, selected: state.selected.size,
+                });
+              }
+            });
+          }
+        };
+
+        searchEl?.addEventListener("input", () => {
+          state.search = searchEl.value.trim().toLowerCase();
+          renderList();
+        });
+
+        for (const chip of root.querySelectorAll(".pf2e-cd-mer-svc-pb-chip")) {
+          chip.addEventListener("click", () => {
+            const cat = chip.dataset.cat;
+            if (state.activeCats.has(cat)) {
+              state.activeCats.delete(cat);
+              chip.classList.remove("is-active");
+            } else {
+              state.activeCats.add(cat);
+              chip.classList.add("is-active");
+            }
+            renderList();
+          });
+        }
+        root.querySelector("[data-action=svc-pb-cat-all]")?.addEventListener("click", () => {
+          subcatList.forEach(c => state.activeCats.add(c));
+          root.querySelectorAll(".pf2e-cd-mer-svc-pb-chip").forEach(c => c.classList.add("is-active"));
+          renderList();
+        });
+        root.querySelector("[data-action=svc-pb-cat-none]")?.addEventListener("click", () => {
+          state.activeCats.clear();
+          root.querySelectorAll(".pf2e-cd-mer-svc-pb-chip").forEach(c => c.classList.remove("is-active"));
+          renderList();
+        });
+        root.querySelector("[data-action=svc-pb-select-visible]")?.addEventListener("click", () => {
+          for (const { idx } of visiblePresets()) state.selected.add(idx);
+          renderList();
+        });
+        root.querySelector("[data-action=svc-pb-select-none]")?.addEventListener("click", () => {
+          state.selected.clear();
+          renderList();
+        });
+
+        renderList();
       },
     });
   }

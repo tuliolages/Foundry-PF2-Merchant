@@ -434,9 +434,14 @@ export function formatCopper(cp) {
 /**
  * Effective per-item BUY price in copper.
  *  - GM-set override wins (no markup applied)
- *  - Otherwise: base × merchant.markup × (1 - rarityDiscount[rarity]) × (1 - dailyOfferPct)
+ *  - Otherwise: base × merchant.markup × (1 - rarityDiscount[rarity]) × (1 - dailyOfferPct) × (1 - characterDiscount)
+ *
+ * @param {Item} item            the merchant's item document
+ * @param {Actor|null} [viewer]  the player character viewing/buying; used for
+ *                               per-character discount lookup (optional —
+ *                               omit for generic display).
  */
-export function effectiveItemPriceCp(item) {
+export function effectiveItemPriceCp(item, viewer = null) {
   const override = getItemPriceOverrideCp(item);
   let cp;
   if (override != null) {
@@ -454,7 +459,52 @@ export function effectiveItemPriceCp(item) {
   }
   const offer = getItemDailyOfferPct(item);
   if (offer > 0) cp = cp * (1 - offer);
+  if (viewer && item?.parent) {
+    const charDisc = getMerchantCharacterDiscount(item.parent, viewer.id);
+    if (charDisc) cp = cp * (1 - charDisc);
+  }
   return Math.max(0, Math.round(cp));
+}
+
+// Per-character discount (in [-1, 1]). Positive = cheaper buy / better sell
+// price for that PC; negative = surcharge. Stored as a flag map on the
+// merchant actor: { [characterId]: number }.
+export function getMerchantCharacterDiscounts(actor) {
+  const v = actor?.flags?.[MODULE_ID]?.characterDiscounts;
+  if (!v || typeof v !== "object") return {};
+  const out = {};
+  for (const [k, x] of Object.entries(v)) {
+    const n = Number(x);
+    if (Number.isFinite(n) && n >= -1 && n <= 1) out[k] = n;
+  }
+  return out;
+}
+
+export function getMerchantCharacterDiscount(actor, characterId) {
+  if (!characterId) return 0;
+  const map = getMerchantCharacterDiscounts(actor);
+  return Number(map[characterId]) || 0;
+}
+
+export async function setMerchantCharacterDiscounts(actor, discounts) {
+  if (!actor) return;
+  const clean = {};
+  for (const [k, v] of Object.entries(discounts ?? {})) {
+    const n = Number(v);
+    if (Number.isFinite(n) && Math.abs(n) > 0.0001) {
+      clean[k] = Math.max(-1, Math.min(1, n));
+    }
+  }
+  return actor.update({ [`flags.${MODULE_ID}.characterDiscounts`]: clean });
+}
+
+/** Effective sell rate for a specific buyer — the merchant pays more if it
+ *  likes the character (positive discount). */
+export function effectiveSellRate(merchant, viewer = null) {
+  const base = getMerchantSellRate(merchant);
+  if (!viewer || !merchant) return base;
+  const disc = getMerchantCharacterDiscount(merchant, viewer.id);
+  return Math.max(0, base * (1 + disc));
 }
 
 /** Per-item daily-offer discount, 0..0.95. Returns 0 if not set. */
