@@ -74,7 +74,6 @@ export function registerSoundSettings() {
 
 function playPath(src, volume) {
   if (!src) return;
-  console.log(`${MODULE_ID} | sound: playing ${src} at volume ${volume}`);
   // Try Foundry's audio helper first — it integrates with the volume mixer.
   try {
     const helper = foundry.audio?.AudioHelper ?? globalThis.AudioHelper;

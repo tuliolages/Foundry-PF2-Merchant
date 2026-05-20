@@ -1,15 +1,24 @@
 {
   "id": "pf2e-cinematic-merchant",
-  "title": "PF2E Cinematic Merchant",
-  "description": "Simple merchant shops for Pathfinder 2e. Link a Loot actor to any tile in the scene, fill it from the compendium browser, and let players browse with rich filtering by category, rarity and level.",
+  "title": "PF2e Merchant",
+  "description": "Click-a-tile merchant shops for Pathfinder 2e. Link a Loot actor to any scene tile, fill it from the compendium browser or weighted random stock, add per-character discounts, daily offers, services, a transaction history and alpha-aware tile click areas — all in a single drag/resize/popout-capable parchment window.",
   "version": "0.1.0",
   "compatibility": {
     "minimum": "13",
-    "verified": "14"
+    "verified": "13",
+    "maximum": "14"
   },
   "authors": [
     { "name": "gooze" }
   ],
+  "url": "https://github.com/Iceman1991/Foundry-PF2-Merchant",
+  "manifest": "https://github.com/Iceman1991/Foundry-PF2-Merchant/releases/latest/download/module.json",
+  "download": "https://github.com/Iceman1991/Foundry-PF2-Merchant/releases/latest/download/module.zip",
+  "readme": "https://github.com/Iceman1991/Foundry-PF2-Merchant/blob/master/README.md",
+  "changelog": "https://github.com/Iceman1991/Foundry-PF2-Merchant/blob/master/CHANGELOG.md",
+  "bugs": "https://github.com/Iceman1991/Foundry-PF2-Merchant/issues",
+  "license": "MIT",
+  "socket": true,
   "esmodules": [
     "scripts/module.js"
   ],
@@ -22,7 +31,10 @@
   ],
   "relationships": {
     "systems": [
-      { "id": "pf2e", "type": "requires" }
+      { "id": "pf2e", "type": "requires", "compatibility": { "minimum": "6.0.0" } }
     ]
+  },
+  "flags": {
+    "allowBugReporter": true
   }
 }

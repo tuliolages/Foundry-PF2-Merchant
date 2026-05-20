@@ -329,13 +329,9 @@ export async function ensureMerchantOwnership(actor) {
       changed = true;
     }
   }
-  if (!changed) {
-    console.log(`${MODULE_ID} | merchant "${actor.name}" already has player ownership`);
-    return;
-  }
+  if (!changed) return;
   try {
     await actor.update({ ownership: next }, { diff: false });
-    console.log(`${MODULE_ID} | merchant ownership refreshed for "${actor.name}"`, next);
   } catch (err) {
     console.warn(`${MODULE_ID} | failed to update merchant ownership for "${actor.name}":`, err);
   }

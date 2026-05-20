@@ -119,6 +119,4 @@ Hooks.once("ready", async () => {
       return n;
     };
   }
-
-  console.log(`${MODULE_ID} | ready`);
 });

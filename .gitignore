@@ -1,0 +1,22 @@
+# OS
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Editors
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Build artefacts
+*.zip
+dist/
+node_modules/
+.cache/
+
+# Misc
+*.log
+.env
+.env.local

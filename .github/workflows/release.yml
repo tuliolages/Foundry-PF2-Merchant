@@ -1,0 +1,53 @@
+name: Build & publish release
+
+on:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Read version from module.json
+        id: ver
+        run: |
+          VERSION=$(node -p "require('./module.json').version")
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+
+      - name: Sanity-check the tag matches module.json
+        run: |
+          TAG_VERSION="${GITHUB_REF_NAME#v}"
+          if [ "$TAG_VERSION" != "${{ steps.ver.outputs.version }}" ]; then
+            echo "::error::Tag $GITHUB_REF_NAME does not match module.json version ${{ steps.ver.outputs.version }}"
+            exit 1
+          fi
+
+      - name: Build module.zip
+        run: |
+          zip -r module.zip \
+            module.json \
+            LICENSE \
+            README.md \
+            CHANGELOG.md \
+            scripts \
+            styles \
+            sounds \
+            lang \
+            -x "*.DS_Store" \
+            -x "node_modules/*"
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          name: "v${{ steps.ver.outputs.version }}"
+          body_path: CHANGELOG.md
+          files: |
+            module.json
+            module.zip

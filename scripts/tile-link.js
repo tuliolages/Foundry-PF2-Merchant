@@ -56,7 +56,6 @@ function getAlphaSampler(src) {
           const y = Math.min(H - 1, Math.max(0, Math.floor(v * H)));
           return data[(y * W + x) * 4 + 3];
         };
-        console.log(`${MODULE_ID} | alpha sampler ready for ${src} (${W}×${H})`);
       } catch (err) {
         // Likely a CORS taint or other security restriction — getImageData
         // throws. Fall back to "always opaque" so behaviour matches the
@@ -142,14 +141,7 @@ function isInsideClickArea(tile, scenePoint) {
   const uv = sceneToTileUV(tile, scenePoint);
   if (!uv) return true;
   const { u, v } = uv;
-  const inside = u >= area.x && u <= area.x + area.w && v >= area.y && v <= area.y + area.h;
-  console.log(`${MODULE_ID} | hit-area test`, {
-    tile: tile.id, area,
-    pointU: u.toFixed(3), pointV: v.toFixed(3),
-    inside,
-    doc: { x: tile.document.x, y: tile.document.y, w: tile.document.width, h: tile.document.height, rot: tile.document.rotation },
-  });
-  return inside;
+  return u >= area.x && u <= area.x + area.w && v >= area.y && v <= area.y + area.h;
 }
 
 /**
@@ -175,12 +167,7 @@ function isOpaqueAtScenePoint(tile, scenePoint) {
     const uv = tileUVToImageUV(tile, tileUv.u, tileUv.v);
     if (!Number.isFinite(uv.u) || !Number.isFinite(uv.v)) return true;
     if (uv.u < 0 || uv.u > 1 || uv.v < 0 || uv.v > 1) return true;
-    const alpha = sampler.sample(uv.u, uv.v);
-    const opaque = alpha >= ALPHA_THRESHOLD;
-    if (!opaque) {
-      console.log(`${MODULE_ID} | alpha hit-test rejected click on ${tile.id}`, { tileU: tileUv.u.toFixed(3), tileV: tileUv.v.toFixed(3), imgU: uv.u.toFixed(3), imgV: uv.v.toFixed(3), alpha });
-    }
-    return opaque;
+    return sampler.sample(uv.u, uv.v) >= ALPHA_THRESHOLD;
   } catch (err) {
     console.warn(`${MODULE_ID} | alpha hit-test threw, falling back to opaque:`, err);
     return true;
@@ -227,15 +214,8 @@ export function registerTileHooks(onTileClick) {
     col.appendChild(btn);
   });
 
-  console.log("pf2e-cinematic-merchant | registerTileHooks called", {
-    hasCanvas: !!canvas,
-    canvasReady: !!canvas?.ready,
-    hasStage: !!canvas?.stage,
-    activeScene: !!game.scenes?.active,
-  });
   // Stage-level click handler — works for players regardless of which layer is active.
   Hooks.on("canvasReady", () => {
-    console.log("pf2e-cinematic-merchant | canvasReady hook fired");
     attachStageHandler();
     prewarmMerchantTileSamplers();
   });
@@ -254,12 +234,6 @@ let _stageHandler = null;
 let _domHandler = null;
 
 function attachStageHandler() {
-  console.log("pf2e-cinematic-merchant | attachStageHandler", {
-    hasStage: !!canvas?.stage,
-    canvasReady: !!canvas?.ready,
-    hasView: !!canvas?.app?.view,
-  });
-
   // DOM-level pointerdown — fires for everyone regardless of PIXI layer permissions.
   const view = canvas?.app?.view;
   if (view) {
@@ -268,13 +242,9 @@ function attachStageHandler() {
     }
     _domHandler = (e) => onCanvasDomClick(e);
     view.addEventListener("pointerdown", _domHandler);
-    console.log("pf2e-cinematic-merchant | DOM pointerdown handler attached on canvas.app.view");
   }
 
-  if (!canvas?.stage) {
-    console.warn("pf2e-cinematic-merchant | canvas.stage missing — handler not attached");
-    return;
-  }
+  if (!canvas?.stage) return;
   if (_stageHandler) {
     try { canvas.stage.off("pointerdown", _stageHandler); } catch { /* tolerate */ }
     _stageHandler = null;
@@ -288,36 +258,9 @@ function attachStageHandler() {
       let point = null;
       try { point = event.data?.getLocalPosition?.(canvas.tiles) ?? null; } catch {}
 
-      const global = event?.data?.global;
-      let stageLocal = null;
-      try { stageLocal = canvas.stage?.toLocal?.(global) ?? null; } catch {}
-      console.log("pf2e-cinematic-merchant | click event", {
-        button,
-        activeLayer: activeLayerName,
-        pointX: point?.x, pointY: point?.y,
-        globalX: global?.x, globalY: global?.y,
-        stageLocalX: stageLocal?.x, stageLocalY: stageLocal?.y,
-        canvasMouseX: canvas.mousePosition?.x, canvasMouseY: canvas.mousePosition?.y,
-        tilesTotal: tiles.length,
-        merchantTilesCount: merchantTiles.length,
-        firstMerchantTile: merchantTiles[0] ? {
-          id: merchantTiles[0].id,
-          x: merchantTiles[0].document.x,
-          y: merchantTiles[0].document.y,
-          w: merchantTiles[0].document.width,
-          h: merchantTiles[0].document.height,
-          actorId: getTileMerchantActorId(merchantTiles[0].document),
-        } : null,
-      });
-
       if (button !== 0 && button !== undefined) return;
-
-      // GM: don't hijack clicks while the tiles layer is active (tile management mode).
-      if (game.user.isGM && canvas.activeLayer === canvas.tiles) {
-        console.log("pf2e-cinematic-merchant | GM on tiles layer, skipping shop open");
-        return;
-      }
-
+      // GM: don't hijack clicks while the tiles layer is active (tile-edit mode).
+      if (game.user.isGM && canvas.activeLayer === canvas.tiles) return;
       if (!point) return;
 
       // Iterate top-to-bottom (last placed = drawn on top).
@@ -328,24 +271,14 @@ function attachStageHandler() {
         const doc = tile.document;
         const inX = point.x >= doc.x && point.x <= doc.x + doc.width;
         const inY = point.y >= doc.y && point.y <= doc.y + doc.height;
-        console.log(`pf2e-cinematic-merchant | hit-test tile ${tile.id}`, { inX, inY, point, doc: { x: doc.x, y: doc.y, w: doc.width, h: doc.height } });
         if (!inX || !inY) continue;
-        // GM-defined rectangular click area: if set, click must fall inside it.
-        if (!isInsideClickArea(tile, point)) {
-          console.log(`pf2e-cinematic-merchant | click outside hit area of ${tile.id}, passing through`);
-          continue;
-        }
-        // Alpha gate — skip clicks on transparent parts of the tile texture.
-        if (!isOpaqueAtScenePoint(tile, point)) {
-          console.log(`pf2e-cinematic-merchant | click on transparent pixel of ${tile.id}, passing through`);
-          continue;
-        }
+        if (!isInsideClickArea(tile, point)) continue;
+        if (!isOpaqueAtScenePoint(tile, point)) continue;
         const actor = getMerchantActor(actorId);
         if (!actor) {
           ui.notifications?.warn(game.i18n.localize("PF2E_CINEMATIC_MERCHANT.warn.actorMissing"));
           return;
         }
-        console.log("pf2e-cinematic-merchant | opening shop for actor", actor.name);
         if (typeof _onTileClick === "function") _onTileClick(actor, tile);
         return;
       }
@@ -354,7 +287,6 @@ function attachStageHandler() {
     }
   };
   canvas.stage.on("pointerdown", _stageHandler);
-  console.log("pf2e-cinematic-merchant | stage pointer handler attached");
 }
 
 function onCanvasDomClick(e) {
@@ -364,23 +296,8 @@ function onCanvasDomClick(e) {
 
     // Foundry maintains canvas.mousePosition in scene coords, updated on mousemove.
     const mp = canvas.mousePosition;
-    const tiles = canvas.tiles?.placeables ?? [];
-    const merchantTiles = tiles.filter(t => getTileMerchantActorId(t.document));
-    const firstM = merchantTiles[0]?.document;
-    console.log("pf2e-cinematic-merchant | DOM click", {
-      mouseX: mp?.x, mouseY: mp?.y,
-      tilesTotal: tiles.length,
-      merchantTilesCount: merchantTiles.length,
-      firstTileX: firstM?.x, firstTileY: firstM?.y,
-      firstTileW: firstM?.width, firstTileH: firstM?.height,
-      firstTileRot: firstM?.rotation,
-      firstTileDeltaX: firstM ? mp.x - firstM.x : null,
-      firstTileDeltaY: firstM ? mp.y - firstM.y : null,
-      firstTileXMin: firstM?.x, firstTileXMax: firstM ? firstM.x + firstM.width : null,
-      firstTileYMin: firstM?.y, firstTileYMax: firstM ? firstM.y + firstM.height : null,
-    });
-
     if (!mp) return;
+    const tiles = canvas.tiles?.placeables ?? [];
 
     for (let i = tiles.length - 1; i >= 0; i--) {
       const tile = tiles[i];
@@ -397,27 +314,14 @@ function onCanvasDomClick(e) {
         inX = mp.x >= doc.x && mp.x <= doc.x + doc.width;
         inY = mp.y >= doc.y && mp.y <= doc.y + doc.height;
       }
-      console.log(`pf2e-cinematic-merchant | DOM hit-test ${tile.id}`, {
-        usedBounds: !!bounds,
-        boundsX: bounds?.x, boundsY: bounds?.y, boundsW: bounds?.width, boundsH: bounds?.height,
-        docX: doc.x, docY: doc.y, docW: doc.width, docH: doc.height,
-        inX, inY,
-      });
       if (!inX || !inY) continue;
-      if (!isInsideClickArea(tile, mp)) {
-        console.log(`pf2e-cinematic-merchant | DOM click outside hit area of ${tile.id}, passing through`);
-        continue;
-      }
-      if (!isOpaqueAtScenePoint(tile, mp)) {
-        console.log(`pf2e-cinematic-merchant | DOM click on transparent pixel of ${tile.id}, passing through`);
-        continue;
-      }
+      if (!isInsideClickArea(tile, mp)) continue;
+      if (!isOpaqueAtScenePoint(tile, mp)) continue;
       const actor = getMerchantActor(actorId);
       if (!actor) {
         ui.notifications?.warn(game.i18n.localize("PF2E_CINEMATIC_MERCHANT.warn.actorMissing"));
         return;
       }
-      console.log("pf2e-cinematic-merchant | DOM click hits merchant tile, opening shop", actor.name);
       if (typeof _onTileClick === "function") _onTileClick(actor, tile);
       return;
     }
