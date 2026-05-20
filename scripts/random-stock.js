@@ -2,6 +2,7 @@
 // from PF2E compendium packs, filtered by level + categories + rarity weights.
 
 import { MODULE_ID, normalizeMerchantType } from "./merchant-store.js";
+import { makeDraggable } from "./draggable.js";
 
 const ALLOWED_TYPES = new Set([
   "weapon", "armor", "shield", "consumable", "equipment", "treasure", "backpack",
@@ -125,6 +126,7 @@ class RandomStockDialog {
         unique: Math.max(0, Number(r.wUnique.value) || 0),
       },
       replace: r.replace.checked,
+      autoPick: r.autoPick?.checked ?? true,
       qtyMin: Math.max(1, Number(r.qtyMin.value) || 1),
       qtyMax: Math.max(1, Number(r.qtyMax.value) || 1),
     };
@@ -181,6 +183,7 @@ class RandomStockDialog {
     }
 
     this._busy = true;
+    this._autoPick = opts.autoPick;
     this.refs.runBtn.disabled = true;
     const origLabel = this.refs.runBtn.querySelector(".label").textContent;
     this.refs.runBtn.querySelector(".label").textContent = t("PF2E_CINEMATIC_MERCHANT.random.generating");
@@ -191,6 +194,9 @@ class RandomStockDialog {
     const merchantRoot = document.getElementById("pf2e-cd-mer-root");
     const prevMerchantVis = merchantRoot?.style.visibility;
     if (merchantRoot) merchantRoot.style.visibility = "hidden";
+
+    this._showLoader();
+    this._setLoaderStage("fetching", 0, opts.count);
 
     try {
       // Pick N items (with replacement allowed; PF2E often has duplicate flavor stock)
@@ -213,6 +219,7 @@ class RandomStockDialog {
         byPack.get(p.packId).push(p._id);
       }
       const itemDataList = [];
+      let fetched = 0;
       for (const [packId, ids] of byPack.entries()) {
         const pack = game.packs.get(packId);
         if (!pack) continue;
@@ -236,10 +243,13 @@ class RandomStockDialog {
             data.system.quantity = q;
           }
           itemDataList.push(data);
+          fetched += 1;
         }
+        this._setLoaderStage("fetching", fetched, picks.length);
       }
 
       if (opts.replace) {
+        this._setLoaderStage("clearing");
         const existingIds = [...this.actor.items].map(i => i.id);
         if (existingIds.length) await this.actor.deleteEmbeddedDocuments("Item", existingIds);
       }
@@ -247,10 +257,12 @@ class RandomStockDialog {
       // Create in chunks of 100
       const CHUNK = 100;
       let created = 0;
+      this._setLoaderStage("creating", 0, itemDataList.length);
       for (let i = 0; i < itemDataList.length; i += CHUNK) {
         const slice = itemDataList.slice(i, i + CHUNK);
         const result = await this.actor.createEmbeddedDocuments("Item", slice);
         created += result?.length ?? 0;
+        this._setLoaderStage("creating", created, itemDataList.length);
       }
       ui.notifications?.info(game.i18n.format("PF2E_CINEMATIC_MERCHANT.random.success", {
         count: created,
@@ -263,6 +275,7 @@ class RandomStockDialog {
       ui.notifications?.error(t("PF2E_CINEMATIC_MERCHANT.random.failed"));
     } finally {
       this._busy = false;
+      this._hideLoader();
       // Restore the merchant frame visibility (we don't necessarily own it).
       if (merchantRoot) merchantRoot.style.visibility = prevMerchantVis ?? "";
       // Restore our own modal in case we didn't close (error path).
@@ -272,6 +285,227 @@ class RandomStockDialog {
         const lbl = this.refs.runBtn.querySelector(".label");
         if (lbl) lbl.textContent = origLabel;
       }
+    }
+  }
+
+  _showLoader() {
+    if (this._loaderEl) return;
+    const el = document.createElement("div");
+    el.id = "pf2e-cd-mer-random-loader";
+    el.innerHTML = `
+      <div class="pf2e-cd-mer-rl-vignette"></div>
+      <div class="pf2e-cd-mer-rl-card" role="status" aria-live="polite">
+        <div class="pf2e-cd-mer-rl-coin">
+          <i class="fa-solid fa-coins"></i>
+        </div>
+        <div class="pf2e-cd-mer-rl-title">${escapeHTML(t("PF2E_CINEMATIC_MERCHANT.random.loadTitle"))}</div>
+        <div class="pf2e-cd-mer-rl-status" data-role="status">${escapeHTML(t("PF2E_CINEMATIC_MERCHANT.random.loadIndexing"))}</div>
+        <div class="pf2e-cd-mer-rl-bar"><div class="pf2e-cd-mer-rl-bar-fill" data-role="bar"></div></div>
+        <div class="pf2e-cd-mer-rl-hint">${escapeHTML(t("PF2E_CINEMATIC_MERCHANT.random.loadHint"))}</div>
+      </div>
+    `;
+    document.body.appendChild(el);
+    // Trigger fade-in on next frame
+    requestAnimationFrame(() => el.classList.add("is-active"));
+    this._loaderEl = el;
+    this._loaderRefs = {
+      status: el.querySelector("[data-role=status]"),
+      bar: el.querySelector("[data-role=bar]"),
+    };
+    // PF2E may raise sub-dialogs (e.g. ammunition / damage-type pickers) while
+    // creating items. Our loader sits at a high z-index and would cover them,
+    // so we step aside while any foreign Foundry Application is open and
+    // restore visibility once the last one closes.
+    this._foreignAppDepth = 0;
+    this._onForeignAppRender = (app) => {
+      // Both our random dialog and the merchant window are plain DOM, not
+      // Foundry Applications, so every render hook here is a foreign dialog.
+      if (!this._loaderEl) return;
+      this._foreignAppDepth++;
+      this._loaderEl.classList.add("is-eclipsed");
+      if (this._autoPick && this._looksLikeChoicePrompt(app)) {
+        // Defer so PF2E finishes wiring up its DOM/form state first.
+        setTimeout(() => this._autoPickChoiceDialog(app), 60);
+      }
+    };
+    this._onForeignAppClose = (app) => {
+      if (!this._loaderEl) return;
+      this._foreignAppDepth = Math.max(0, this._foreignAppDepth - 1);
+      if (this._foreignAppDepth === 0) {
+        this._loaderEl.classList.remove("is-eclipsed");
+      }
+    };
+    Hooks.on("renderApplication", this._onForeignAppRender);
+    Hooks.on("closeApplication", this._onForeignAppClose);
+    Hooks.on("renderApplicationV2", this._onForeignAppRender);
+    Hooks.on("closeApplicationV2", this._onForeignAppClose);
+  }
+
+  _setLoaderStage(stage, done, total) {
+    if (!this._loaderRefs) return;
+    let key, pct;
+    if (stage === "clearing") {
+      key = "PF2E_CINEMATIC_MERCHANT.random.loadClearing";
+      pct = null; // indeterminate
+    } else if (stage === "creating") {
+      key = "PF2E_CINEMATIC_MERCHANT.random.loadCreating";
+      pct = total ? Math.min(100, Math.round((done / total) * 100)) : 0;
+    } else {
+      key = "PF2E_CINEMATIC_MERCHANT.random.loadFetching";
+      pct = total ? Math.min(100, Math.round((done / total) * 100)) : 0;
+    }
+    const txt = (stage === "clearing")
+      ? t(key)
+      : game.i18n.format(key, { done: done ?? 0, total: total ?? 0 });
+    this._loaderRefs.status.textContent = txt;
+    if (pct == null) {
+      this._loaderRefs.bar.classList.add("is-indeterminate");
+      this._loaderRefs.bar.style.width = "100%";
+    } else {
+      this._loaderRefs.bar.classList.remove("is-indeterminate");
+      this._loaderRefs.bar.style.width = `${pct}%`;
+    }
+  }
+
+  _hideLoader() {
+    const el = this._loaderEl;
+    if (!el) return;
+    el.classList.remove("is-active");
+    setTimeout(() => { try { el.remove(); } catch {} }, 220);
+    this._loaderEl = null;
+    this._loaderRefs = null;
+    if (this._onForeignAppRender) {
+      Hooks.off("renderApplication", this._onForeignAppRender);
+      Hooks.off("renderApplicationV2", this._onForeignAppRender);
+    }
+    if (this._onForeignAppClose) {
+      Hooks.off("closeApplication", this._onForeignAppClose);
+      Hooks.off("closeApplicationV2", this._onForeignAppClose);
+    }
+    this._onForeignAppRender = null;
+    this._onForeignAppClose = null;
+    this._foreignAppDepth = 0;
+  }
+
+  _getAppEl(app) {
+    if (!app) return null;
+    if (app.element instanceof HTMLElement) return app.element;
+    if (app.element?.[0] instanceof HTMLElement) return app.element[0];
+    return null;
+  }
+
+  _looksLikeChoicePrompt(app) {
+    if (!app) return false;
+    const name = app?.constructor?.name ?? "";
+    if (/Choice|Prompt|Picker|Selection|RuleElement|Ammo|Ammunition/i.test(name)) return true;
+    const el = this._getAppEl(app);
+    if (!el) return false;
+    if (el.matches?.(".choice-set-prompt, .dialog.choice-set-prompt, [class*='choice-set']")) return true;
+    if (el.querySelector?.(".choice-set-prompt, [data-choices], [name='selection'], [name='choice']")) return true;
+    // Generic small modal with a single select + submit button is a strong signal.
+    const select = el.querySelector?.("select");
+    const submit = el.querySelector?.(
+      "button[type='submit'], button[data-button='ok'], button[data-button='save'], " +
+      "button[data-action='submit'], button[data-action='save'], .dialog-button.ok"
+    );
+    if (select && submit) return true;
+    return false;
+  }
+
+  _findOkButton(el) {
+    if (!el) return null;
+    // Specific known submit patterns
+    const specific = el.querySelector(
+      ".dialog-button.ok, .dialog-button.yes, " +
+      "button[data-button='ok'], button[data-button='yes'], button[data-button='save'], button[data-button='confirm'], " +
+      "button[data-action='ok'], button[data-action='save'], button[data-action='confirm'], button[data-action='submit']"
+    );
+    if (specific) return specific;
+    // Generic submit
+    const submit = el.querySelector("button[type='submit']");
+    if (submit) return submit;
+    // Label-matching fallback (Save / OK / Submit / Confirm in EN+DE)
+    const re = /^(save|ok|submit|confirm|speichern|bestätigen|ja|yes)$/i;
+    const candidates = [...el.querySelectorAll("button, .dialog-button")];
+    return candidates.find(b => re.test((b.textContent ?? "").trim())) ?? null;
+  }
+
+  _pickSelectOption(el) {
+    const select = el.querySelector("select");
+    if (!select || !select.options || select.options.length === 0) return false;
+    const pickable = [...select.options].filter(o => !o.disabled && o.value !== "" && o.value != null);
+    if (pickable.length === 0) return false;
+    const choice = pickable[Math.floor(Math.random() * pickable.length)];
+    select.value = choice.value;
+    select.selectedIndex = choice.index;
+    select.dispatchEvent(new Event("change", { bubbles: true }));
+    select.dispatchEvent(new Event("input", { bubbles: true }));
+    return true;
+  }
+
+  _pickRadioOption(el) {
+    const radios = [...el.querySelectorAll("input[type='radio']")].filter(r => !r.disabled);
+    if (radios.length === 0) return false;
+    const choice = radios[Math.floor(Math.random() * radios.length)];
+    choice.checked = true;
+    choice.dispatchEvent(new Event("change", { bubbles: true }));
+    choice.dispatchEvent(new Event("input", { bubbles: true }));
+    return true;
+  }
+
+  async _autoPickChoiceDialog(app) {
+    if (!app) return;
+    // PF2E may populate options asynchronously (e.g. compendium lookups), and
+    // the submit button is often disabled until a valid choice exists. Retry
+    // a few times to give the dialog a chance to finish wiring up.
+    const MAX_ATTEMPTS = 12;
+    const DELAY_MS = 120;
+    let picked = false;
+
+    for (let attempt = 0; attempt < MAX_ATTEMPTS; attempt++) {
+      if (app.rendered === false) return;
+      const el = this._getAppEl(app);
+      if (!el || !document.body.contains(el)) {
+        await new Promise(r => setTimeout(r, DELAY_MS));
+        continue;
+      }
+
+      if (!picked) {
+        try {
+          picked = this._pickSelectOption(el) || this._pickRadioOption(el);
+        } catch (err) {
+          console.warn(`${MODULE_ID} | random-stock: auto-pick select failed:`, err);
+        }
+      }
+
+      if (picked) {
+        // Let the form revalidate before checking the submit button.
+        await new Promise(r => setTimeout(r, 60));
+        if (app.rendered === false) return;
+        const currentEl = this._getAppEl(app);
+        if (!currentEl || !document.body.contains(currentEl)) return;
+        const ok = this._findOkButton(currentEl);
+        if (ok && !ok.disabled && ok.offsetParent !== null) {
+          try { ok.click(); return; } catch (err) {
+            console.warn(`${MODULE_ID} | random-stock: auto-pick click failed:`, err);
+          }
+        }
+      }
+
+      await new Promise(r => setTimeout(r, DELAY_MS));
+    }
+
+    // Last-ditch attempts if the button never enabled or we never found a select.
+    const el = this._getAppEl(app);
+    if (!el || !document.body.contains(el)) return;
+    if (!picked && typeof app.submit === "function") {
+      try { await app.submit(); return; } catch {}
+    }
+    const ok = this._findOkButton(el);
+    if (ok && !ok.disabled) {
+      try { ok.click(); } catch {}
+    } else {
+      console.warn(`${MODULE_ID} | random-stock: auto-pick gave up on`, app?.constructor?.name);
     }
   }
 
@@ -290,6 +524,7 @@ class RandomStockDialog {
       qtyMin:    root.querySelector("[name=rs-qty-min]"),
       qtyMax:    root.querySelector("[name=rs-qty-max]"),
       replace:   root.querySelector("[name=rs-replace]"),
+      autoPick:  root.querySelector("[name=rs-auto-pick]"),
       cats:      root.querySelector(".pf2e-cd-mer-random-cats"),
       wCommon:   root.querySelector("[name=rs-w-common]"),
       wUncommon: root.querySelector("[name=rs-w-uncommon]"),
@@ -306,6 +541,8 @@ class RandomStockDialog {
     this.refs.vignette.addEventListener("click", () => this.close());
     this.refs.runBtn.addEventListener("click", () => this._generate());
     document.addEventListener("keydown", (e) => { if (e.key === "Escape" && this.root?.classList.contains("is-active")) this.close(); });
+
+    makeDraggable(this.refs.frame, this.refs.title, "random-stock");
 
     for (const chip of root.querySelectorAll(".pf2e-cd-mer-cat-chip")) {
       chip.addEventListener("click", () => {
@@ -374,6 +611,11 @@ class RandomStockDialog {
         <label class="pf2e-cd-mer-random-replace">
           <input type="checkbox" name="rs-replace" />
           <span>${escapeHTML(t("PF2E_CINEMATIC_MERCHANT.random.replace"))}</span>
+        </label>
+
+        <label class="pf2e-cd-mer-random-replace" title="${escapeHTML(t("PF2E_CINEMATIC_MERCHANT.random.autoPickHint"))}">
+          <input type="checkbox" name="rs-auto-pick" checked />
+          <span>${escapeHTML(t("PF2E_CINEMATIC_MERCHANT.random.autoPick"))}</span>
         </label>
 
         <div class="pf2e-cd-mer-random-preview">—</div>

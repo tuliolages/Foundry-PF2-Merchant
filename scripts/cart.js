@@ -4,6 +4,7 @@
 import {
   MODULE_ID, effectiveItemPriceCp, formatCopper, priceToCopper, copperToCoins,
 } from "./merchant-store.js";
+import { makeDraggable } from "./draggable.js";
 
 let _activeDrawer = null;
 
@@ -139,6 +140,11 @@ class CartDrawer {
     this.root = root;
     root.querySelector("[data-action=close]").addEventListener("click", () => this.close());
     root.querySelector(".pf2e-cd-mer-cart-vignette").addEventListener("click", () => this.close());
+    makeDraggable(
+      root.querySelector(".pf2e-cd-mer-cart-frame"),
+      root.querySelector(".pf2e-cd-mer-cart-header"),
+      "cart"
+    );
     root.querySelector("[data-action=cart-clear]").addEventListener("click", () => {
       this.cart.clear();
       this.onChanged?.();

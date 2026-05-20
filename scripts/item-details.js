@@ -1,6 +1,7 @@
 // Custom item details modal — PF2E parchment styling, key stats, description, buy button.
 
 import { MODULE_ID, effectiveItemPriceCp, formatCopper } from "./merchant-store.js";
+import { makeDraggable } from "./draggable.js";
 
 const RARITY_LABELS = { common: "common", uncommon: "uncommon", rare: "rare", unique: "unique" };
 
@@ -113,6 +114,11 @@ class ItemDetailsModal {
 
     root.querySelector("[data-action=close]")?.addEventListener("click", () => this.close());
     root.querySelector(".pf2e-cd-mer-detail-vignette")?.addEventListener("click", () => this.close());
+    makeDraggable(
+      root.querySelector(".pf2e-cd-mer-detail-frame"),
+      root.querySelector(".pf2e-cd-mer-detail-header"),
+      "item-details"
+    );
     const buyBtn = root.querySelector("[data-action=buy]");
     buyBtn?.addEventListener("click", () => {
       if (this.onBuy) this.onBuy(this.item);

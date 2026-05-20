@@ -1,6 +1,7 @@
 // Modal listing the player's inventory with Sell buttons per item.
 
 import { MODULE_ID, priceToCopper, formatCopper, getMerchantSellRate, isCoinItem } from "./merchant-store.js";
+import { makeDraggable } from "./draggable.js";
 
 const SELLABLE_TYPES = new Set([
   "weapon", "armor", "shield", "consumable", "equipment", "treasure", "backpack",
@@ -95,6 +96,11 @@ class SellListModal {
     };
     this.refs.closeBtn.addEventListener("click", () => this.close());
     this.refs.vignette.addEventListener("click", () => this.close());
+    makeDraggable(
+      root.querySelector(".pf2e-cd-mer-sell-frame"),
+      root.querySelector(".pf2e-cd-mer-sell-header"),
+      "sell-list"
+    );
     this.refs.search.addEventListener("input", () => {
       this.search = this.refs.search.value.trim().toLowerCase();
       this._renderList();

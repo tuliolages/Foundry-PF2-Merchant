@@ -5,6 +5,7 @@
 
 import { MODULE_ID, formatCopper, priceToCopper, isCoinItem } from "./merchant-store.js";
 import { playVault } from "./sound-fx.js";
+import { makeDraggable } from "./draggable.js";
 
 const FLAG = "vault";
 
@@ -182,6 +183,11 @@ class VaultModal {
     this.root = root;
     root.querySelector("[data-action=close]").addEventListener("click", () => this.close());
     root.querySelector(".pf2e-cd-mer-vault-vignette").addEventListener("click", () => this.close());
+    makeDraggable(
+      root.querySelector(".pf2e-cd-mer-vault-frame"),
+      root.querySelector(".pf2e-cd-mer-vault-header"),
+      "vault"
+    );
     const searchInput = root.querySelector("[name=vault-search]");
     searchInput.addEventListener("input", () => {
       this.search = searchInput.value.trim().toLowerCase();

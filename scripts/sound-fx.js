@@ -156,3 +156,20 @@ export function playClick() {
   if (!isEnabled()) return;
   playPath(getPath(KEYS.vault, DEFAULT_VAULT), readVolume() * 0.4);
 }
+
+// Per-merchant greeting: picks a random path from the configured list and
+// plays it after the shop-bell. No-op if list is empty or sounds disabled.
+export function playGreetingSounds(paths) {
+  if (!isEnabled()) return;
+  if (!Array.isArray(paths) || paths.length === 0) return;
+  const pick = paths[Math.floor(Math.random() * paths.length)];
+  if (!pick) return;
+  playPath(pick, readVolume());
+}
+
+// Preview a single greeting sound at the user's configured volume — used by
+// the settings dialog so the GM can audition before saving.
+export function previewSound(path) {
+  if (!path) return;
+  playPath(path, readVolume());
+}

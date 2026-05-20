@@ -19,6 +19,50 @@ export async function setTileMerchantActorId(tileDoc, actorId) {
   return tileDoc.update({ [`flags.${TILE_FLAG_SCOPE}.-=actorId`]: null });
 }
 
+// Per-tile flag: when true, only clicks on opaque pixels of the tile's image
+// trigger the merchant (Monks-ATT-style "use image instead of border").
+export function getTileUseImageAlpha(tileDoc) {
+  return !!tileDoc?.flags?.[TILE_FLAG_SCOPE]?.useImageAlpha;
+}
+
+export async function setTileUseImageAlpha(tileDoc, value) {
+  if (!tileDoc) return;
+  if (value) {
+    return tileDoc.update({ [`flags.${TILE_FLAG_SCOPE}.useImageAlpha`]: true });
+  }
+  return tileDoc.update({ [`flags.${TILE_FLAG_SCOPE}.-=useImageAlpha`]: null });
+}
+
+// Per-tile rectangular click area (in 0..1 fractions of the tile rect). When
+// set, clicks outside this rectangle pass through instead of opening the shop.
+// Stored as a flag so it travels with the tile.
+export function getTileClickArea(tileDoc) {
+  const a = tileDoc?.flags?.[TILE_FLAG_SCOPE]?.clickArea;
+  if (!a) return null;
+  const x = Number(a.x);
+  const y = Number(a.y);
+  const w = Number(a.w);
+  const h = Number(a.h);
+  if (![x, y, w, h].every(Number.isFinite)) return null;
+  return { x, y, w, h };
+}
+
+export async function setTileClickArea(tileDoc, area) {
+  if (!tileDoc) return;
+  // Full-tile (default) → clear the flag so the tile behaves like a vanilla one.
+  if (!area || (area.x <= 0 && area.y <= 0 && area.x + area.w >= 1 && area.y + area.h >= 1)) {
+    return tileDoc.update({ [`flags.${TILE_FLAG_SCOPE}.-=clickArea`]: null });
+  }
+  return tileDoc.update({
+    [`flags.${TILE_FLAG_SCOPE}.clickArea`]: {
+      x: Math.max(0, Math.min(1, area.x)),
+      y: Math.max(0, Math.min(1, area.y)),
+      w: Math.max(0.02, Math.min(1, area.w)),
+      h: Math.max(0.02, Math.min(1, area.h)),
+    },
+  });
+}
+
 export function getMerchantActor(actorId) {
   if (!actorId) return null;
   const actor = game.actors?.get?.(actorId);
@@ -84,14 +128,27 @@ export function getMerchantRarityDiscounts(actor) {
   return out;
 }
 
-export function getMerchantGreeting(actor) {
-  const v = actor?.flags?.[MODULE_ID]?.greeting;
-  return typeof v === "string" ? v : "";
+export function getMerchantPortraitMirrored(actor) {
+  return !!actor?.flags?.[MODULE_ID]?.portraitMirrored;
 }
 
-export async function setMerchantGreeting(actor, text) {
+export async function setMerchantPortraitMirrored(actor, mirrored) {
   if (!actor) return;
-  return actor.update({ [`flags.${MODULE_ID}.greeting`]: String(text ?? "") });
+  return actor.update({ [`flags.${MODULE_ID}.portraitMirrored`]: !!mirrored });
+}
+
+export function getMerchantGreetingSounds(actor) {
+  const v = actor?.flags?.[MODULE_ID]?.greetingSounds;
+  if (!Array.isArray(v)) return [];
+  return v.filter(p => typeof p === "string" && p.length > 0);
+}
+
+export async function setMerchantGreetingSounds(actor, paths) {
+  if (!actor) return;
+  const clean = Array.isArray(paths)
+    ? paths.filter(p => typeof p === "string" && p.length > 0)
+    : [];
+  return actor.update({ [`flags.${MODULE_ID}.greetingSounds`]: clean });
 }
 
 export async function setMerchantRarityDiscounts(actor, discounts) {
@@ -377,19 +434,53 @@ export function formatCopper(cp) {
 /**
  * Effective per-item BUY price in copper.
  *  - GM-set override wins (no markup applied)
- *  - Otherwise: base × merchant.markup × (1 - rarityDiscount[rarity])
+ *  - Otherwise: base × merchant.markup × (1 - rarityDiscount[rarity]) × (1 - dailyOfferPct)
  */
 export function effectiveItemPriceCp(item) {
   const override = getItemPriceOverrideCp(item);
-  if (override != null) return override;
-  let cp = priceToCopper(item.system?.price);
-  const actor = item?.parent;
-  if (actor) {
-    const markup = getMerchantMarkup(actor);
-    const rarityDisc = getMerchantRarityDiscounts(actor);
-    const rarity = item.system?.traits?.rarity ?? "common";
-    const rDisc = Number(rarityDisc?.[rarity] ?? 0);
-    cp = cp * markup * (1 - rDisc);
+  let cp;
+  if (override != null) {
+    cp = override;
+  } else {
+    cp = priceToCopper(item.system?.price);
+    const actor = item?.parent;
+    if (actor) {
+      const markup = getMerchantMarkup(actor);
+      const rarityDisc = getMerchantRarityDiscounts(actor);
+      const rarity = item.system?.traits?.rarity ?? "common";
+      const rDisc = Number(rarityDisc?.[rarity] ?? 0);
+      cp = cp * markup * (1 - rDisc);
+    }
   }
+  const offer = getItemDailyOfferPct(item);
+  if (offer > 0) cp = cp * (1 - offer);
   return Math.max(0, Math.round(cp));
+}
+
+/** Per-item daily-offer discount, 0..0.95. Returns 0 if not set. */
+export function getItemDailyOfferPct(item) {
+  const v = Number(item?.flags?.[ITEM_FLAG_SCOPE]?.dailyOfferPct);
+  if (!Number.isFinite(v)) return 0;
+  return Math.max(0, Math.min(0.95, v));
+}
+
+export async function setItemDailyOfferPct(item, pct) {
+  if (!item) return;
+  if (pct == null || !Number.isFinite(Number(pct)) || Number(pct) <= 0) {
+    return item.update({ [`flags.${ITEM_FLAG_SCOPE}.-=dailyOfferPct`]: null });
+  }
+  const clean = Math.max(0, Math.min(0.95, Number(pct)));
+  return item.update({ [`flags.${ITEM_FLAG_SCOPE}.dailyOfferPct`]: clean });
+}
+
+/** Items currently on offer for this merchant. */
+export function getMerchantDailyOffers(actor) {
+  if (!actor?.items) return [];
+  const out = [];
+  for (const it of actor.items) {
+    if (isCoinItem(it)) continue;
+    const pct = getItemDailyOfferPct(it);
+    if (pct > 0) out.push(it);
+  }
+  return out;
 }

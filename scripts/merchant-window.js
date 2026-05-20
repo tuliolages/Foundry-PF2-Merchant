@@ -10,14 +10,20 @@ import {
   setMerchantMarkup,
   getMerchantRarityDiscounts,
   setMerchantRarityDiscounts,
-  getMerchantGreeting,
-  setMerchantGreeting,
+  getMerchantGreetingSounds,
+  setMerchantGreetingSounds,
+  getMerchantPortraitMirrored,
+  setMerchantPortraitMirrored,
   readMerchantCoins,
   setMerchantCoins,
   ensureMerchantOwnership,
   setItemPriceOverrideCp,
   getItemPriceOverrideCp,
   isCoinItem,
+  getItemIdentityKey,
+  getItemDailyOfferPct,
+  setItemDailyOfferPct,
+  getMerchantDailyOffers,
   normalizeMerchantType,
   getMerchantServices,
   addMerchantService,
@@ -32,7 +38,7 @@ import { openCompareModal } from "./compare-modal.js";
 import { openRandomStockDialog } from "./random-stock.js";
 import { isWishlisted, toggleWishlist, getAllWishlistKeys, getItemKey } from "./wishlist.js";
 import { Cart, openCartDrawer } from "./cart.js";
-import { playOpen, playBuy, playSell, playClick } from "./sound-fx.js";
+import { playOpen, playBuy, playSell, playClick, playGreetingSounds, previewSound } from "./sound-fx.js";
 import { openVault, vaultCount } from "./vault.js";
 import { callGM } from "./socket-bridge.js";
 
@@ -77,6 +83,18 @@ function escapeHTML(s) {
   })[ch]);
 }
 
+// Pretty-print usage / group slugs from PF2E. "held-in-two-hands" → "Held in
+// two hands". If a localization key exists for the slug, prefer it.
+function localizeUsageOrGroup(slug) {
+  if (!slug) return "";
+  const key = `PF2E.${slug}`;
+  const localized = game.i18n.localize(key);
+  if (localized && localized !== key) return localized;
+  return String(slug)
+    .replace(/-/g, " ")
+    .replace(/\b\w/g, ch => ch.toUpperCase());
+}
+
 function readActorCoins(actor) {
   if (!actor) return { pp: 0, gp: 0, sp: 0, cp: 0 };
   // Try PF2E v14 inventory.coins (CoinAmount object)
@@ -106,6 +124,10 @@ export class MerchantWindow {
       levelMax: null,
       affordableOnly: false,
       sort: "default", // default | priceAsc | priceDesc | levelAsc | levelDesc | nameAsc | nameDesc
+      usage: "all",       // e.g. held-in-one-hand, worn-armor, …
+      group: "all",       // e.g. axe, sword, bow, leather, plate
+      bulk: "all",        // all | 0 | L | 1 | 2 | 3 | 4plus
+      magical: "all",     // all | yes | no
     };
     this._actorHookId = null;
     this.compareSet = new Set(); // item ids selected for comparison
@@ -126,14 +148,20 @@ export class MerchantWindow {
       frame:        root.querySelector(".pf2e-cd-mer-frame"),
       title:        root.querySelector(".pf2e-cd-mer-title"),
       subtitle:     root.querySelector(".pf2e-cd-mer-subtitle"),
-      greeting:     root.querySelector(".pf2e-cd-mer-greeting"),
       gold:         root.querySelector(".pf2e-cd-mer-gold-value"),
       goldLabel:    root.querySelector(".pf2e-cd-mer-gold-label"),
       closeBtn:     root.querySelector(".pf2e-cd-mer-close"),
+      popoutBtn:    root.querySelector(".pf2e-cd-mer-popout"),
       search:       root.querySelector("[name=mer-search]"),
       raritySel:    root.querySelector("[name=mer-rarity]"),
       levelMin:     root.querySelector("[name=mer-level-min]"),
       levelMax:     root.querySelector("[name=mer-level-max]"),
+      usageSel:     root.querySelector("[name=mer-usage]"),
+      groupSel:     root.querySelector("[name=mer-group]"),
+      bulkSel:      root.querySelector("[name=mer-bulk]"),
+      magicalSel:   root.querySelector("[name=mer-magical]"),
+      filtersAdv:   root.querySelector("[data-role=merchant-filters-advanced]"),
+      filtersToggleBtn: root.querySelector("[data-action=filters-toggle]"),
       filtersBar:   root.querySelector(".pf2e-cd-mer-filters"),
       backBar:      root.querySelector(".pf2e-cd-mer-back-bar"),
       backBtn:      root.querySelector("[data-action=back]"),
@@ -148,6 +176,7 @@ export class MerchantWindow {
       gmSettingsBtn:root.querySelector("[data-action=gm-settings]"),
       portraitImg:  root.querySelector(".pf2e-cd-mer-portrait-img"),
       portraitFrame:root.querySelector(".pf2e-cd-mer-portrait-frame"),
+      portraitFlip: root.querySelector(".pf2e-cd-mer-portrait-flip"),
       sortSel:      root.querySelector("[name=mer-sort]"),
       affordableCb: root.querySelector("[name=mer-affordable]"),
       compareBar:   root.querySelector(".pf2e-cd-mer-compare-bar"),
@@ -160,9 +189,328 @@ export class MerchantWindow {
       gmRandomBtn:  root.querySelector("[data-action=gm-random]"),
       vaultBtn:     root.querySelector("[data-action=open-vault]"),
       vaultCount:   root.querySelector(".pf2e-cd-mer-vault-count"),
+      header:       root.querySelector(".pf2e-cd-mer-header"),
+      dailyOffers:  root.querySelector(".pf2e-cd-mer-daily-offers"),
     };
 
     this._wireUI();
+    this._wireDrag();
+    this._wireResize();
+    this._restoreWindowPosition();
+    this._restoreWindowSize();
+  }
+
+  _wireDrag() {
+    const handle = this.refs.header;
+    const frame = this.refs.frame;
+    if (!handle || !frame) return;
+    handle.classList.add("is-drag-handle");
+
+    let startX = 0, startY = 0, startLeft = 0, startTop = 0;
+    let activePointerId = null;
+
+    const isInteractive = (target) =>
+      !!target.closest?.("button, a, input, select, textarea, [data-role]");
+
+    const onPointerDown = (e) => {
+      if (e.button !== 0) return;
+      if (isInteractive(e.target)) return;
+      const rect = frame.getBoundingClientRect();
+      // Switch to absolute pixel positioning so deltas work intuitively.
+      frame.style.left = `${rect.left}px`;
+      frame.style.top = `${rect.top}px`;
+      frame.style.transform = "none";
+      frame.classList.add("is-dragged", "is-dragging");
+      startX = e.clientX;
+      startY = e.clientY;
+      startLeft = rect.left;
+      startTop = rect.top;
+      activePointerId = e.pointerId;
+      handle.setPointerCapture?.(e.pointerId);
+      e.preventDefault();
+    };
+
+    const onPointerMove = (e) => {
+      if (activePointerId !== e.pointerId) return;
+      const dx = e.clientX - startX;
+      const dy = e.clientY - startY;
+      // Clamp so the header always stays grab-able (>=40px visible on each edge).
+      const margin = 40;
+      const maxLeft = window.innerWidth - margin;
+      const maxTop = window.innerHeight - margin;
+      const minLeft = margin - frame.offsetWidth;
+      const minTop = 0;
+      const left = Math.min(maxLeft, Math.max(minLeft, startLeft + dx));
+      const top  = Math.min(maxTop,  Math.max(minTop,  startTop  + dy));
+      frame.style.left = `${left}px`;
+      frame.style.top  = `${top}px`;
+    };
+
+    const onPointerUp = (e) => {
+      if (activePointerId !== e.pointerId) return;
+      activePointerId = null;
+      handle.releasePointerCapture?.(e.pointerId);
+      frame.classList.remove("is-dragging");
+      this._saveWindowPosition();
+    };
+
+    handle.addEventListener("pointerdown", onPointerDown);
+    handle.addEventListener("pointermove", onPointerMove);
+    handle.addEventListener("pointerup", onPointerUp);
+    handle.addEventListener("pointercancel", onPointerUp);
+
+    // Double-click on the header resets back to centered.
+    handle.addEventListener("dblclick", (e) => {
+      if (isInteractive(e.target)) return;
+      this._resetWindowPosition();
+    });
+  }
+
+  _saveWindowPosition() {
+    const frame = this.refs.frame;
+    if (!frame) return;
+    const left = parseFloat(frame.style.left);
+    const top  = parseFloat(frame.style.top);
+    if (!Number.isFinite(left) || !Number.isFinite(top)) return;
+    try {
+      localStorage.setItem(`${MODULE_ID}:windowPos`, JSON.stringify({ left, top }));
+    } catch {}
+  }
+
+  _restoreWindowPosition() {
+    const frame = this.refs.frame;
+    if (!frame) return;
+    let saved = null;
+    try {
+      const raw = localStorage.getItem(`${MODULE_ID}:windowPos`);
+      if (raw) saved = JSON.parse(raw);
+    } catch {}
+    if (!saved || !Number.isFinite(saved.left) || !Number.isFinite(saved.top)) return;
+    const margin = 40;
+    const left = Math.min(window.innerWidth - margin, Math.max(margin - frame.offsetWidth || -600, saved.left));
+    const top  = Math.min(window.innerHeight - margin, Math.max(0, saved.top));
+    frame.style.left = `${left}px`;
+    frame.style.top  = `${top}px`;
+    frame.style.transform = "none";
+    frame.classList.add("is-dragged");
+  }
+
+  _resetWindowPosition() {
+    const frame = this.refs.frame;
+    if (!frame) return;
+    frame.classList.remove("is-dragged");
+    frame.style.left = "";
+    frame.style.top = "";
+    frame.style.transform = "";
+    try { localStorage.removeItem(`${MODULE_ID}:windowPos`); } catch {}
+  }
+
+  // === Resize via bottom-right grip handle ================================
+
+  _wireResize() {
+    const frame = this.refs.frame;
+    const handle = frame?.querySelector("[data-role=resize-handle]");
+    if (!frame || !handle) return;
+
+    const MIN_W = 480;
+    const MIN_H = 420;
+
+    let startX = 0, startY = 0, startW = 0, startH = 0;
+    let activePointerId = null;
+
+    const onPointerDown = (e) => {
+      if (e.button !== 0) return;
+      // Skip when popped out — the OS window handles its own size.
+      if (this.root?.classList.contains("is-popped-out")) return;
+      const rect = frame.getBoundingClientRect();
+      startX = e.clientX;
+      startY = e.clientY;
+      startW = rect.width;
+      startH = rect.height;
+      activePointerId = e.pointerId;
+      handle.setPointerCapture?.(e.pointerId);
+      // Drop the centering transform so explicit width/height take over.
+      // If the frame hasn't been dragged yet, lock its current position so
+      // resizing doesn't snap it back to center.
+      if (!frame.classList.contains("is-dragged")) {
+        frame.style.left = `${rect.left}px`;
+        frame.style.top = `${rect.top}px`;
+        frame.style.transform = "none";
+        frame.classList.add("is-dragged");
+      }
+      frame.classList.add("is-resizing");
+      e.preventDefault();
+      e.stopPropagation();
+    };
+
+    const onPointerMove = (e) => {
+      if (activePointerId !== e.pointerId) return;
+      const margin = 12;
+      const maxW = window.innerWidth - margin * 2;
+      const maxH = window.innerHeight - margin * 2;
+      const w = Math.max(MIN_W, Math.min(maxW, startW + (e.clientX - startX)));
+      const h = Math.max(MIN_H, Math.min(maxH, startH + (e.clientY - startY)));
+      frame.style.width = `${w}px`;
+      frame.style.height = `${h}px`;
+      frame.style.maxHeight = `${h}px`;
+    };
+
+    const onPointerUp = (e) => {
+      if (activePointerId !== e.pointerId) return;
+      activePointerId = null;
+      handle.releasePointerCapture?.(e.pointerId);
+      frame.classList.remove("is-resizing");
+      this._saveWindowSize();
+    };
+
+    handle.addEventListener("pointerdown", onPointerDown);
+    handle.addEventListener("pointermove", onPointerMove);
+    handle.addEventListener("pointerup", onPointerUp);
+    handle.addEventListener("pointercancel", onPointerUp);
+    // Double-click resets to default (clamp-based) sizing.
+    handle.addEventListener("dblclick", (e) => {
+      e.stopPropagation();
+      this._resetWindowSize();
+    });
+  }
+
+  _saveWindowSize() {
+    const frame = this.refs.frame;
+    if (!frame) return;
+    const w = parseFloat(frame.style.width);
+    const h = parseFloat(frame.style.height);
+    if (!Number.isFinite(w) || !Number.isFinite(h)) return;
+    try {
+      localStorage.setItem(`${MODULE_ID}:windowSize`, JSON.stringify({ w, h }));
+    } catch {}
+  }
+
+  _restoreWindowSize() {
+    const frame = this.refs.frame;
+    if (!frame) return;
+    let saved = null;
+    try {
+      const raw = localStorage.getItem(`${MODULE_ID}:windowSize`);
+      if (raw) saved = JSON.parse(raw);
+    } catch {}
+    if (!saved || !Number.isFinite(saved.w) || !Number.isFinite(saved.h)) return;
+    const margin = 12;
+    const w = Math.max(480, Math.min(window.innerWidth - margin * 2, saved.w));
+    const h = Math.max(420, Math.min(window.innerHeight - margin * 2, saved.h));
+    frame.style.width = `${w}px`;
+    frame.style.height = `${h}px`;
+    frame.style.maxHeight = `${h}px`;
+  }
+
+  _resetWindowSize() {
+    const frame = this.refs.frame;
+    if (!frame) return;
+    frame.style.width = "";
+    frame.style.height = "";
+    frame.style.maxHeight = "";
+    try { localStorage.removeItem(`${MODULE_ID}:windowSize`); } catch {}
+  }
+
+  // === Popout into a separate OS-level browser window =====================
+  // Foundry V14 supports popout for ApplicationV2 natively, but our merchant
+  // is a raw DOM tree. We achieve the same effect by physically moving the
+  // root element into a new same-origin window — event handlers and Foundry
+  // globals continue to work because we share the JS context (window.opener).
+  // Sibling modals (cart, sell, compare, vault, picker, random) move along
+  // so they remain reachable from the popped-out window.
+
+  togglePopout() {
+    if (this._popoutWin && !this._popoutWin.closed) {
+      this._popoutWin.close();
+      return;
+    }
+    this._openPopout();
+  }
+
+  async _openPopout() {
+    if (!this.root) return;
+    const frame = this.refs.frame;
+    const w = Math.max(720, frame?.offsetWidth ?? 900);
+    const h = Math.max(560, frame?.offsetHeight ?? 720);
+    const features = `width=${w + 40},height=${h + 60},menubar=no,toolbar=no,location=no,status=no,resizable=yes`;
+    const win = window.open("about:blank", `${MODULE_ID}-${this.actor?.id ?? "merchant"}`, features);
+    if (!win) {
+      ui.notifications?.warn(game.i18n.localize("PF2E_CINEMATIC_MERCHANT.window.popoutBlocked"));
+      return;
+    }
+    this._popoutWin = win;
+
+    // Wait until the new document is ready.
+    if (win.document.readyState !== "complete") {
+      await new Promise(res => win.addEventListener("load", res, { once: true }));
+    }
+
+    // Mirror Foundry's stylesheets so the merchant looks identical in the
+    // popped-out window. Same-origin: absolute hrefs (which Foundry uses) load
+    // directly; relative ones are resolved against the main doc's baseURI.
+    win.document.title = `${this.actor?.name ?? "Merchant"} — ${game.i18n.localize("PF2E_CINEMATIC_MERCHANT.window.subtitle")}`;
+    const head = win.document.head;
+    for (const node of document.head.querySelectorAll('link[rel="stylesheet"], style')) {
+      const clone = node.cloneNode(true);
+      const href = node.getAttribute?.("href");
+      if (href) clone.setAttribute("href", new URL(href, document.baseURI).href);
+      head.appendChild(clone);
+    }
+
+    // Bare-bones body styling — the moved root takes care of the rest.
+    win.document.body.style.cssText = `
+      margin: 0; padding: 0;
+      background: rgba(0,0,0,0.85);
+      height: 100vh; overflow: hidden;
+      font-family: inherit;
+    `;
+
+    // Move our own roots + any side-modals so the popout window is fully
+    // self-contained for the typical interactions.
+    this.root.classList.add("is-popped-out");
+    this._popoutMovedNodes = [];
+    const selectors = [
+      "#pf2e-cd-mer-root",
+      "#pf2e-cd-mer-cart-root",
+      "#pf2e-cd-mer-sell-root",
+      "#pf2e-cd-mer-compare-root",
+      "#pf2e-cd-mer-vault-root",
+      "#pf2e-cd-mer-picker-root",
+      "#pf2e-cd-mer-random-root",
+      "#pf2e-cd-mer-random-loader",
+      "#pf2e-cd-mer-item-details-root",
+    ];
+    for (const sel of selectors) {
+      const node = document.querySelector(sel);
+      if (!node) continue;
+      this._popoutMovedNodes.push({ node, parent: node.parentNode, next: node.nextSibling });
+      win.document.body.appendChild(node);
+    }
+
+    // When the popout closes, dock everything back.
+    const onUnload = () => this._restoreFromPopout();
+    win.addEventListener("beforeunload", onUnload);
+    win.addEventListener("unload", onUnload);
+    // Also restore on viewer page navigation just in case.
+    window.addEventListener("beforeunload", () => {
+      try { win.close(); } catch {}
+    }, { once: true });
+  }
+
+  _restoreFromPopout() {
+    if (!this._popoutMovedNodes) return;
+    for (const { node, parent, next } of this._popoutMovedNodes) {
+      try {
+        if (next && next.parentNode === parent) parent.insertBefore(node, next);
+        else parent.appendChild(node);
+      } catch (err) {
+        // Parent might be gone (rare) — fall back to body.
+        document.body.appendChild(node);
+      }
+    }
+    this._popoutMovedNodes = null;
+    this.root?.classList.remove("is-popped-out");
+    this._popoutWin = null;
   }
 
   open(actor, tile = null) {
@@ -189,6 +537,7 @@ export class MerchantWindow {
     this._refreshVaultBar();
     this._renderItems();
     playOpen();
+    playGreetingSounds(getMerchantGreetingSounds(this.actor));
 
     // Watch for inventory changes
     if (this._actorHookId) Hooks.off("updateActor", this._actorHookId);
@@ -224,6 +573,10 @@ export class MerchantWindow {
   close() {
     if (!this.root) return;
     this._postTransactionLog();
+    // If popped out, fold the window back into the main doc before hiding.
+    if (this._popoutWin && !this._popoutWin.closed) {
+      try { this._popoutWin.close(); } catch {}
+    }
     this.root.classList.remove("is-active");
     this.refs.frame.classList.remove("is-revealed");
     if (this._actorHookId) {
@@ -291,16 +644,6 @@ export class MerchantWindow {
     this.refs.title.textContent = this.actor?.name ?? "—";
     this.refs.subtitle.textContent = game.i18n.localize("PF2E_CINEMATIC_MERCHANT.window.subtitle");
     if (this.refs.gmToolbar) this.refs.gmToolbar.hidden = !game.user.isGM;
-    if (this.refs.greeting) {
-      const greeting = getMerchantGreeting(this.actor).trim();
-      if (greeting) {
-        this.refs.greeting.textContent = `„${greeting}"`;
-        this.refs.greeting.hidden = false;
-      } else {
-        this.refs.greeting.textContent = "";
-        this.refs.greeting.hidden = true;
-      }
-    }
   }
 
   _refreshCompareBar() {
@@ -327,6 +670,20 @@ export class MerchantWindow {
     } else {
       this.refs.portraitImg.hidden = true;
     }
+    // Apply mirror state and show/hide the GM flip button.
+    const mirrored = getMerchantPortraitMirrored(this.actor);
+    this.refs.portraitImg.classList.toggle("is-mirrored", mirrored);
+    if (this.refs.portraitFlip) {
+      this.refs.portraitFlip.hidden = !game.user.isGM;
+      this.refs.portraitFlip.classList.toggle("is-active", mirrored);
+    }
+  }
+
+  async _handleTogglePortraitMirror() {
+    if (!game.user.isGM || !this.actor) return;
+    const next = !getMerchantPortraitMirrored(this.actor);
+    await setMerchantPortraitMirrored(this.actor, next);
+    this._refreshPortrait();
   }
 
   _refreshGold() {
@@ -354,6 +711,11 @@ export class MerchantWindow {
 
   _wireUI() {
     this.refs.closeBtn.addEventListener("click", () => this.close());
+    this.refs.popoutBtn?.addEventListener("click", () => this.togglePopout());
+    this.refs.portraitFlip?.addEventListener("click", (e) => {
+      e.stopPropagation();
+      this._handleTogglePortraitMirror();
+    });
 
     if (this.refs.gmImportBtn)   this.refs.gmImportBtn.addEventListener("click", () => this._handleImport());
     if (this.refs.gmClearBtn)    this.refs.gmClearBtn.addEventListener("click",  () => this._handleClearAll());
@@ -376,6 +738,17 @@ export class MerchantWindow {
     });
     this.refs.sortSel.addEventListener("change", () => { this.filters.sort = this.refs.sortSel.value; this._renderItems(); });
     this.refs.affordableCb.addEventListener("change", () => { this.filters.affordableOnly = this.refs.affordableCb.checked; this._renderItems(); });
+    this.refs.usageSel?.addEventListener("change", () => { this.filters.usage = this.refs.usageSel.value; this._renderItems(); });
+    this.refs.groupSel?.addEventListener("change", () => { this.filters.group = this.refs.groupSel.value; this._renderItems(); });
+    this.refs.bulkSel?.addEventListener("change", () => { this.filters.bulk = this.refs.bulkSel.value; this._renderItems(); });
+    this.refs.magicalSel?.addEventListener("change", () => { this.filters.magical = this.refs.magicalSel.value; this._renderItems(); });
+    this.refs.filtersToggleBtn?.addEventListener("click", () => {
+      const bar = this.refs.filtersBar;
+      const collapsed = bar.classList.toggle("is-collapsed");
+      if (this.refs.filtersAdv) this.refs.filtersAdv.hidden = collapsed;
+      const chev = this.refs.filtersToggleBtn.querySelector("i");
+      if (chev) chev.className = collapsed ? "fa-solid fa-chevron-down" : "fa-solid fa-chevron-up";
+    });
 
     if (this.refs.compareOpenBtn) this.refs.compareOpenBtn.addEventListener("click", () => this._openCompareModal());
     if (this.refs.compareClearBtn) this.refs.compareClearBtn.addEventListener("click", () => this._clearCompare());
@@ -432,6 +805,8 @@ export class MerchantWindow {
     if (editBtn) { e.stopPropagation(); this._handleEditPrice(editBtn.dataset.itemId); return; }
     const editQtyBtn = e.target.closest("[data-action=edit-qty]");
     if (editQtyBtn) { e.stopPropagation(); this._handleEditQty(editQtyBtn.dataset.itemId); return; }
+    const editOfferBtn = e.target.closest("[data-action=edit-offer]");
+    if (editOfferBtn) { e.stopPropagation(); this._handleEditOffer(editOfferBtn.dataset.itemId); return; }
     const delBtn  = e.target.closest("[data-action=delete]");
     if (delBtn)  { e.stopPropagation(); this._handleDelete(delBtn.dataset.itemId); return; }
     // Service handlers
@@ -576,6 +951,37 @@ export class MerchantWindow {
       this.refs.vaultCount.textContent = n > 0 ? String(n) : "";
       this.refs.vaultCount.hidden = n === 0;
     }
+  }
+
+  async _handleEditOffer(itemId) {
+    if (!game.user.isGM || !this.actor) return;
+    const item = this.actor.items.get(itemId);
+    if (!item) return;
+    const current = Math.round(getItemDailyOfferPct(item) * 100);
+    const DialogV2 = foundry.applications?.api?.DialogV2;
+    if (!DialogV2) return;
+    await DialogV2.prompt({
+      window: { title: game.i18n.format("PF2E_CINEMATIC_MERCHANT.window.editOfferFor", { item: item.name }) },
+      content: `
+        <form class="pf2e-cd-mer-qty-form">
+          <label>${game.i18n.localize("PF2E_CINEMATIC_MERCHANT.window.editOffer")}
+            <input type="number" name="offerPct" min="0" max="95" step="5" value="${current}" autofocus />
+          </label>
+          <p class="pf2e-cd-mer-info">${game.i18n.localize("PF2E_CINEMATIC_MERCHANT.window.editOfferHint")}</p>
+        </form>
+      `,
+      classes: ["pf2e-cd-mer-dialog", "pf2e-cd-mer-qty-dialog"],
+      ok: {
+        label: game.i18n.localize("PF2E_CINEMATIC_MERCHANT.window.savePrice"),
+        icon: "fa-solid fa-save",
+        callback: async (event, button, dialog) => {
+          const root = dialog?.element instanceof HTMLElement ? dialog.element : dialog?.element?.[0];
+          const raw = Number(root?.querySelector("[name=offerPct]")?.value ?? 0);
+          const pct = Math.max(0, Math.min(95, Math.floor(raw))) / 100;
+          await setItemDailyOfferPct(item, pct);
+        },
+      },
+    });
   }
 
   async _handleEditQty(itemId) {
@@ -735,14 +1141,20 @@ export class MerchantWindow {
     const markup = getMerchantMarkup(this.actor);
     const discounts = getMerchantRarityDiscounts(this.actor);
     const sellRate = getMerchantSellRate(this.actor);
-    const greeting = getMerchantGreeting(this.actor);
+    const greetingSounds = [...getMerchantGreetingSounds(this.actor)];
     const coins = readMerchantCoins(this.actor);
     const content = `
       <form class="pf2e-cd-mer-settings-form">
         <p class="pf2e-cd-mer-info">${game.i18n.localize("PF2E_CINEMATIC_MERCHANT.settings.info")}</p>
-        <label>${game.i18n.localize("PF2E_CINEMATIC_MERCHANT.settings.greeting")}
-          <textarea name="greeting" rows="2" placeholder="${escapeHTML(game.i18n.localize("PF2E_CINEMATIC_MERCHANT.settings.greetingPlaceholder"))}">${escapeHTML(greeting)}</textarea>
-        </label>
+        <fieldset class="pf2e-cd-mer-greeting-sounds-field">
+          <legend>${game.i18n.localize("PF2E_CINEMATIC_MERCHANT.settings.greetingSounds")}</legend>
+          <p class="pf2e-cd-mer-info">${game.i18n.localize("PF2E_CINEMATIC_MERCHANT.settings.greetingSoundsHint")}</p>
+          <ul class="pf2e-cd-mer-greeting-sounds-list" data-role="greeting-list"></ul>
+          <button type="button" class="pf2e-cd-mer-greeting-sounds-add" data-action="add-greeting-sound">
+            <i class="fa-solid fa-plus"></i>
+            <span>${escapeHTML(game.i18n.localize("PF2E_CINEMATIC_MERCHANT.settings.greetingSoundsAdd"))}</span>
+          </button>
+        </fieldset>
         <fieldset>
           <legend>${game.i18n.localize("PF2E_CINEMATIC_MERCHANT.settings.merchantPurse")}</legend>
           <div class="pf2e-cd-mer-settings-coin-grid">
@@ -777,8 +1189,14 @@ export class MerchantWindow {
     if (!DialogV2) return;
     await DialogV2.prompt({
       window: { title: game.i18n.localize("PF2E_CINEMATIC_MERCHANT.settings.title") },
+      position: { width: 560 },
       content,
-      classes: ["pf2e-cd-mer-dialog"],
+      classes: ["pf2e-cd-mer-dialog", "pf2e-cd-mer-settings-dialog"],
+      render: (event, dialog) => {
+        const root = dialog?.element instanceof HTMLElement ? dialog.element : dialog?.element?.[0];
+        if (!root) return;
+        this._wireGreetingSoundList(root, greetingSounds);
+      },
       ok: {
         label: game.i18n.localize("PF2E_CINEMATIC_MERCHANT.settings.save"),
         icon: "fa-solid fa-save",
@@ -786,7 +1204,6 @@ export class MerchantWindow {
           const root = dialog?.element instanceof HTMLElement ? dialog.element : dialog?.element?.[0];
           const markupV = Number(root?.querySelector("[name=markup]")?.value ?? 1);
           const sellV = Number(root?.querySelector("[name=sellRate]")?.value ?? 0.5);
-          const greetingV = String(root?.querySelector("[name=greeting]")?.value ?? "");
           const newDiscounts = {};
           for (const r of ["common","uncommon","rare","unique"]) {
             newDiscounts[r] = Number(root?.querySelector(`[name=r-${r}]`)?.value ?? 0);
@@ -800,7 +1217,7 @@ export class MerchantWindow {
           await setMerchantMarkup(this.actor, markupV);
           await setMerchantSellRate(this.actor, sellV);
           await setMerchantRarityDiscounts(this.actor, newDiscounts);
-          await setMerchantGreeting(this.actor, greetingV);
+          await setMerchantGreetingSounds(this.actor, greetingSounds);
           await setMerchantCoins(this.actor, newCoins);
           this._refreshHeader();
           this._renderItems();
@@ -808,6 +1225,80 @@ export class MerchantWindow {
         },
       },
     });
+  }
+
+  _wireGreetingSoundList(root, sounds) {
+    const list = root.querySelector("[data-role=greeting-list]");
+    const addBtn = root.querySelector("[data-action=add-greeting-sound]");
+    if (!list || !addBtn) return;
+
+    const renderRow = (path, idx) => {
+      const li = document.createElement("li");
+      li.className = "pf2e-cd-mer-greeting-sound-row";
+      li.dataset.idx = String(idx);
+      // Split path so the row shows just the filename prominently and the
+      // parent folder muted next to it — full path stays in the tooltip.
+      const parts = String(path).split(/[\\/]/);
+      const fname = parts.pop() ?? path;
+      const parent = parts.length > 0 ? parts[parts.length - 1] : "";
+      li.innerHTML = `
+        <button type="button" class="pf2e-cd-mer-greeting-sound-play" data-action="play" title="${escapeHTML(game.i18n.localize("PF2E_CINEMATIC_MERCHANT.settings.greetingSoundsPlay"))}">
+          <i class="fa-solid fa-play"></i>
+        </button>
+        <div class="pf2e-cd-mer-greeting-sound-path" title="${escapeHTML(path)}">
+          <span class="pf2e-cd-mer-greeting-sound-name">${escapeHTML(fname)}</span>
+          ${parent ? `<span class="pf2e-cd-mer-greeting-sound-parent">${escapeHTML(parent)}/</span>` : ""}
+        </div>
+        <button type="button" class="pf2e-cd-mer-greeting-sound-remove" data-action="remove" title="${escapeHTML(game.i18n.localize("PF2E_CINEMATIC_MERCHANT.settings.greetingSoundsRemove"))}">
+          <i class="fa-solid fa-xmark"></i>
+        </button>
+      `;
+      return li;
+    };
+
+    const renderList = () => {
+      list.innerHTML = "";
+      if (sounds.length === 0) {
+        const li = document.createElement("li");
+        li.className = "pf2e-cd-mer-greeting-sounds-empty";
+        li.textContent = game.i18n.localize("PF2E_CINEMATIC_MERCHANT.settings.greetingSoundsEmpty");
+        list.appendChild(li);
+        return;
+      }
+      sounds.forEach((p, i) => list.appendChild(renderRow(p, i)));
+    };
+
+    list.addEventListener("click", (e) => {
+      const playBtn = e.target.closest("[data-action=play]");
+      const removeBtn = e.target.closest("[data-action=remove]");
+      const row = e.target.closest(".pf2e-cd-mer-greeting-sound-row");
+      if (!row) return;
+      const idx = Number(row.dataset.idx);
+      if (playBtn) {
+        previewSound(sounds[idx]);
+      } else if (removeBtn) {
+        sounds.splice(idx, 1);
+        renderList();
+      }
+    });
+
+    addBtn.addEventListener("click", async () => {
+      const FP = foundry.applications?.apps?.FilePicker?.implementation ?? globalThis.FilePicker;
+      if (!FP) return;
+      const picker = new FP({
+        type: "audio",
+        current: sounds[sounds.length - 1] ?? "",
+        callback: (path) => {
+          if (typeof path === "string" && path.length > 0 && !sounds.includes(path)) {
+            sounds.push(path);
+            renderList();
+          }
+        },
+      });
+      picker.render(true);
+    });
+
+    renderList();
   }
 
   _debounce(fn, ms) {
@@ -830,6 +1321,72 @@ export class MerchantWindow {
     } else {
       this._renderItemList();
     }
+    this._renderDailyOffers();
+  }
+
+  _renderDailyOffers() {
+    const host = this.refs.dailyOffers;
+    if (!host) return;
+    const offers = getMerchantDailyOffers(this.actor);
+    if (offers.length === 0) {
+      host.hidden = true;
+      host.innerHTML = "";
+      return;
+    }
+    host.hidden = false;
+    const cards = offers.slice(0, 6).map(item => {
+      const pct = getItemDailyOfferPct(item);
+      const cp = effectiveItemPriceCp(item);
+      const orig = Math.round(cp / (1 - pct));
+      const img = item.img ?? "icons/svg/item-bag.svg";
+      return `
+        <button type="button" class="pf2e-cd-mer-daily-offer-card" data-action="daily-offer-jump" data-item-id="${item.id}" title="${escapeHTML(item.name)}">
+          <img class="pf2e-cd-mer-daily-offer-img" src="${escapeHTML(img)}" alt="" />
+          <div class="pf2e-cd-mer-daily-offer-body">
+            <div class="pf2e-cd-mer-daily-offer-name">${escapeHTML(item.name)}</div>
+            <div class="pf2e-cd-mer-daily-offer-prices">
+              <span class="pf2e-cd-mer-price-strike">${formatCopper(orig)}</span>
+              <span class="pf2e-cd-mer-daily-offer-price">${formatCopper(cp)}</span>
+            </div>
+          </div>
+          <span class="pf2e-cd-mer-daily-offer-badge">-${Math.round(pct * 100)}%</span>
+        </button>
+      `;
+    }).join("");
+    host.innerHTML = `
+      <div class="pf2e-cd-mer-daily-offers-title">
+        <i class="fa-solid fa-tags"></i>
+        ${escapeHTML(game.i18n.localize("PF2E_CINEMATIC_MERCHANT.window.dailyOffers"))}
+      </div>
+      <div class="pf2e-cd-mer-daily-offers-list">${cards}</div>
+    `;
+    host.onclick = (e) => {
+      const card = e.target.closest("[data-action=daily-offer-jump]");
+      if (!card) return;
+      const itemId = card.dataset.itemId;
+      this._jumpToOfferItem(itemId);
+    };
+  }
+
+  _jumpToOfferItem(itemId) {
+    const item = this.actor?.items?.get?.(itemId);
+    if (!item) return;
+    // Switch to "all items" view, prefill search with the name, then scroll to row.
+    this.viewMode = "items";
+    this.filters.category = "all";
+    this.filters.wishlistOnly = false;
+    if (this.refs.wishlistCb) this.refs.wishlistCb.checked = false;
+    this.filters.search = item.name.toLowerCase();
+    if (this.refs.search) this.refs.search.value = item.name;
+    this._renderItems();
+    setTimeout(() => {
+      const row = this.refs.itemList?.querySelector(`.pf2e-cd-mer-item[data-item-id="${itemId}"]`);
+      if (row) {
+        row.scrollIntoView({ behavior: "smooth", block: "center" });
+        row.classList.add("is-highlight");
+        setTimeout(() => row.classList.remove("is-highlight"), 1400);
+      }
+    }, 40);
   }
 
   _renderServiceList() {
@@ -1295,6 +1852,7 @@ export class MerchantWindow {
     this.refs.currentCat.textContent = catLabel;
 
     const items = this._collectItems();
+    this._populateDynamicFilters(items);
     const filtered = this._filterItems(items);
 
     if (filtered.length === 0) {
@@ -1303,6 +1861,8 @@ export class MerchantWindow {
       return;
     }
     this.refs.empty.hidden = true;
+
+    this._ownedMap = this._buildViewerOwnedMap();
 
     const RENDER_CAP = 200;
     const sliced = filtered.slice(0, RENDER_CAP);
@@ -1365,6 +1925,20 @@ export class MerchantWindow {
     }
   }
 
+  _buildViewerOwnedMap() {
+    const map = new Map();
+    const viewer = this.viewer;
+    if (!viewer?.items) return map;
+    for (const it of viewer.items) {
+      if (isCoinItem(it)) continue;
+      const key = getItemIdentityKey(it);
+      if (!key) continue;
+      const qty = Math.max(1, Number(it.system?.quantity ?? 1));
+      map.set(key, (map.get(key) ?? 0) + qty);
+    }
+    return map;
+  }
+
   _collectItems() {
     if (!this.actor) return [];
     const items = this.actor.items ?? [];
@@ -1373,6 +1947,69 @@ export class MerchantWindow {
       const allowed = new Set(["weapon","armor","shield","consumable","equipment","treasure","backpack","ammunition","kit"]);
       return it.system?.price !== undefined || allowed.has(it.type);
     });
+  }
+
+  // Walk the current visible item set, collect distinct values for the
+  // dynamic filters (usage / group), populate the <select>s and hide ones
+  // that wouldn't actually filter anything. Bulk + Magical always shown.
+  _populateDynamicFilters(items) {
+    const r = this.refs;
+    const f = this.filters;
+    // Pre-filter by the *non-dynamic* filters so the dropdowns only offer
+    // values that would actually narrow down the visible set further.
+    const lvlOK = (it) => {
+      const lvl = Number(it.system?.level?.value ?? 0);
+      if (f.levelMin != null && lvl < f.levelMin) return false;
+      if (f.levelMax != null && lvl > f.levelMax) return false;
+      return true;
+    };
+    const catOK = (it) => f.category === "all" || effectiveItemType(it) === f.category;
+    const candidates = items.filter(it => catOK(it) && lvlOK(it));
+
+    const usages = new Set();
+    const groups = new Set();
+    for (const it of candidates) {
+      const u = it.system?.usage?.value;
+      if (u) usages.add(u);
+      const g = it.system?.group;
+      if (g) groups.add(g);
+    }
+
+    const fillSelect = (sel, current, values, emptyLabel) => {
+      if (!sel) return;
+      if (values.size <= 1) {
+        sel.hidden = true;
+        sel.value = "all";
+        return;
+      }
+      sel.hidden = false;
+      const sorted = [...values].sort((a, b) => a.localeCompare(b));
+      const opts = [`<option value="all">${escapeHTML(emptyLabel)}</option>`];
+      for (const v of sorted) {
+        opts.push(`<option value="${escapeHTML(v)}"${v === current ? " selected" : ""}>${escapeHTML(localizeUsageOrGroup(v))}</option>`);
+      }
+      sel.innerHTML = opts.join("");
+      // Restore selection if still valid; otherwise reset.
+      if (current !== "all" && !values.has(current)) {
+        sel.value = "all";
+        if (sel === r.usageSel) f.usage = "all";
+        if (sel === r.groupSel) f.group = "all";
+      } else {
+        sel.value = current;
+      }
+    };
+    fillSelect(r.usageSel, f.usage, usages, r.usageSel?.dataset?.emptyLabel ?? "Any usage");
+    fillSelect(r.groupSel, f.group, groups, r.groupSel?.dataset?.emptyLabel ?? "Any group");
+
+    // Bulk + magical are always available (most stocks contain a mix).
+    if (r.bulkSel) {
+      r.bulkSel.hidden = candidates.length < 2;
+      r.bulkSel.value = f.bulk;
+    }
+    if (r.magicalSel) {
+      r.magicalSel.hidden = candidates.length < 2;
+      r.magicalSel.value = f.magical;
+    }
   }
 
   _filterItems(items) {
@@ -1397,6 +2034,33 @@ export class MerchantWindow {
         if (price > viewerCp) return false;
       }
       if (wishKeys && !wishKeys.has(getItemKey(it))) return false;
+      if (f.usage !== "all") {
+        const u = it.system?.usage?.value ?? "";
+        if (u !== f.usage) return false;
+      }
+      if (f.group !== "all") {
+        const g = it.system?.group ?? "";
+        if (g !== f.group) return false;
+      }
+      if (f.bulk !== "all") {
+        const bv = Number(it.system?.bulk?.value ?? 0);
+        let ok = false;
+        switch (f.bulk) {
+          case "0":     ok = bv === 0; break;
+          case "L":     ok = bv > 0 && bv < 1; break; // PF2E treats light as 0.1
+          case "1":     ok = bv >= 1 && bv < 2; break;
+          case "2":     ok = bv >= 2 && bv < 3; break;
+          case "3":     ok = bv >= 3 && bv < 4; break;
+          case "4plus": ok = bv >= 4; break;
+        }
+        if (!ok) return false;
+      }
+      if (f.magical !== "all") {
+        const traits = it.system?.traits?.value ?? [];
+        const isMagical = Array.isArray(traits) && traits.includes("magical");
+        if (f.magical === "yes" && !isMagical) return false;
+        if (f.magical === "no" && isMagical) return false;
+      }
       return true;
     });
     return filtered.sort((a, b) => {
@@ -1432,10 +2096,25 @@ export class MerchantWindow {
     const editQtyBtn = game.user.isGM
       ? `<button type="button" class="pf2e-cd-mer-edit-qty" data-action="edit-qty" data-item-id="${item.id}" title="${game.i18n.localize("PF2E_CINEMATIC_MERCHANT.window.editQty")}"><i class="fa-solid fa-cubes-stacked"></i></button>`
       : "";
+    const overrideMark = isOverride ? `<span class="pf2e-cd-mer-override" title="${game.i18n.localize("PF2E_CINEMATIC_MERCHANT.window.priceOverridden")}">*</span>` : "";
+    const offerPct = getItemDailyOfferPct(item);
+    const editOfferBtn = game.user.isGM
+      ? `<button type="button" class="pf2e-cd-mer-edit-offer ${offerPct > 0 ? "is-active" : ""}" data-action="edit-offer" data-item-id="${item.id}" title="${game.i18n.localize("PF2E_CINEMATIC_MERCHANT.window.editOffer")}"><i class="fa-solid fa-tag"></i></button>`
+      : "";
+    const dailyBadge = offerPct > 0
+      ? `<span class="pf2e-cd-mer-item-tag pf2e-cd-mer-tag-offer" title="${escapeHTML(game.i18n.localize("PF2E_CINEMATIC_MERCHANT.window.dailyOfferTooltip"))}"><i class="fa-solid fa-tag"></i> -${Math.round(offerPct * 100)}%</span>`
+      : "";
+    let priceMarkup;
+    if (offerPct > 0) {
+      // Compute the pre-offer price by un-applying the discount.
+      const originalCp = Math.round(cp / (1 - offerPct));
+      priceMarkup = `<span class="pf2e-cd-mer-item-price has-offer"><span class="pf2e-cd-mer-price-strike">${formatCopper(originalCp)}</span> ${formatCopper(cp)}${overrideMark}</span>`;
+    } else {
+      priceMarkup = `<span class="pf2e-cd-mer-item-price">${formatCopper(cp)}${overrideMark}</span>`;
+    }
     const deleteBtn = game.user.isGM
       ? `<button type="button" class="pf2e-cd-mer-delete" data-action="delete" data-item-id="${item.id}" title="${game.i18n.localize("PF2E_CINEMATIC_MERCHANT.window.deleteItem")}"><i class="fa-solid fa-xmark"></i></button>`
       : "";
-    const overrideMark = isOverride ? `<span class="pf2e-cd-mer-override" title="${game.i18n.localize("PF2E_CINEMATIC_MERCHANT.window.priceOverridden")}">*</span>` : "";
     const buyDisabled = canBuy ? "" : "disabled";
     const compareChecked = this.compareSet.has(item.id) ? "checked" : "";
     const compareLabel = game.i18n.localize("PF2E_CINEMATIC_MERCHANT.window.compareToggle");
@@ -1456,19 +2135,26 @@ export class MerchantWindow {
         <i class="fa-solid fa-cart-plus"></i>
       </button>`
       : "";
+    const ownedQty = this._ownedMap?.get(getItemIdentityKey(item)) ?? 0;
+    const ownedBadge = ownedQty > 0
+      ? `<span class="pf2e-cd-mer-item-tag pf2e-cd-mer-tag-owned" title="${escapeHTML(game.i18n.format("PF2E_CINEMATIC_MERCHANT.window.ownedTooltip", { qty: ownedQty }))}"><i class="fa-solid fa-backpack"></i> ×${ownedQty}</span>`
+      : "";
+    const ownedClass = ownedQty > 0 ? " is-owned" : "";
     return `
-      <div class="pf2e-cd-mer-item rarity-${rarity}" data-item-id="${item.id}">
+      <div class="pf2e-cd-mer-item rarity-${rarity}${ownedClass}" data-item-id="${item.id}">
         <img class="pf2e-cd-mer-item-img" src="${escapeHTML(img)}" alt="" />
         <div class="pf2e-cd-mer-item-main">
           <div class="pf2e-cd-mer-item-line1">
             <span class="pf2e-cd-mer-item-name">${escapeHTML(item.name)}</span>
-            <span class="pf2e-cd-mer-item-price">${formatCopper(cp)}${overrideMark}</span>
+            ${priceMarkup}
           </div>
           <div class="pf2e-cd-mer-item-line2">
             <span class="pf2e-cd-mer-item-tag pf2e-cd-mer-tag-cat">${escapeHTML(localizeCategory(cat))}</span>
             <span class="pf2e-cd-mer-item-tag pf2e-cd-mer-tag-rarity rarity-${rarity}">${escapeHTML(localizeRarity(rarity))}</span>
             <span class="pf2e-cd-mer-item-tag pf2e-cd-mer-tag-level">L ${lvl}</span>
             ${qty > 1 ? `<span class="pf2e-cd-mer-item-tag pf2e-cd-mer-tag-qty">×${qty}</span>` : ""}
+            ${dailyBadge}
+            ${ownedBadge}
           </div>
         </div>
         <div class="pf2e-cd-mer-item-actions">
@@ -1476,6 +2162,7 @@ export class MerchantWindow {
           ${compareBtn}
           ${cartAddBtn}
           ${editQtyBtn}
+          ${editOfferBtn}
           ${editPriceBtn}
           <button type="button" class="pf2e-cd-mer-buy" data-action="buy" data-item-id="${item.id}" ${buyDisabled}>
             <i class="fa-solid fa-coins"></i> ${game.i18n.localize("PF2E_CINEMATIC_MERCHANT.window.buy")}
@@ -1756,6 +2443,9 @@ export class MerchantWindow {
     return `
       <div class="pf2e-cd-mer-vignette"></div>
       <div class="pf2e-cd-mer-frame">
+        <button type="button" class="pf2e-cd-mer-popout" title="${game.i18n.localize("PF2E_CINEMATIC_MERCHANT.window.popoutBtn")}" data-action="popout">
+          <i class="fa-solid fa-up-right-from-square"></i>
+        </button>
         <button type="button" class="pf2e-cd-mer-close" title="${game.i18n.localize("PF2E_CINEMATIC_MERCHANT.window.close")}">
           <i class="fa-solid fa-xmark"></i>
         </button>
@@ -1763,10 +2453,10 @@ export class MerchantWindow {
         <div class="pf2e-cd-mer-corner tr"></div>
         <div class="pf2e-cd-mer-corner bl"></div>
         <div class="pf2e-cd-mer-corner br"></div>
+        <div class="pf2e-cd-mer-resize" data-role="resize-handle" title="${game.i18n.localize("PF2E_CINEMATIC_MERCHANT.window.resizeHint")}"></div>
         <div class="pf2e-cd-mer-header">
           <div class="pf2e-cd-mer-subtitle"></div>
           <div class="pf2e-cd-mer-title"></div>
-          <div class="pf2e-cd-mer-greeting" hidden></div>
           <div class="pf2e-cd-mer-gold-block">
             <span class="pf2e-cd-mer-gold-label"></span>
             <span class="pf2e-cd-mer-gold-value">—</span>
@@ -1776,7 +2466,11 @@ export class MerchantWindow {
           <div class="pf2e-cd-mer-portrait-col">
             <div class="pf2e-cd-mer-portrait-frame">
               <img class="pf2e-cd-mer-portrait-img" src="" alt="" />
+              <button type="button" class="pf2e-cd-mer-portrait-flip" data-action="portrait-flip" hidden title="${game.i18n.localize("PF2E_CINEMATIC_MERCHANT.window.portraitFlip")}">
+                <i class="fa-solid fa-arrows-left-right"></i>
+              </button>
             </div>
+            <div class="pf2e-cd-mer-daily-offers" hidden></div>
           </div>
           <div class="pf2e-cd-mer-content-col">
             <div class="pf2e-cd-mer-gm-toolbar" hidden>
@@ -1804,27 +2498,51 @@ export class MerchantWindow {
               </button>
               <span class="pf2e-cd-mer-current-cat"></span>
             </div>
-            <div class="pf2e-cd-mer-filters" hidden>
-              <input type="text" name="mer-search" placeholder="${game.i18n.localize("PF2E_CINEMATIC_MERCHANT.filter.search")}" />
-              <select name="mer-rarity">${rarOpts}</select>
-              <input type="number" name="mer-level-min" min="0" max="25" placeholder="${game.i18n.localize("PF2E_CINEMATIC_MERCHANT.filter.levelMin")}" />
-              <input type="number" name="mer-level-max" min="0" max="25" placeholder="${game.i18n.localize("PF2E_CINEMATIC_MERCHANT.filter.levelMax")}" />
-              <select name="mer-sort">
-                <option value="default">${game.i18n.localize("PF2E_CINEMATIC_MERCHANT.filter.sortDefault")}</option>
-                <option value="priceAsc">${game.i18n.localize("PF2E_CINEMATIC_MERCHANT.filter.sortPriceAsc")}</option>
-                <option value="priceDesc">${game.i18n.localize("PF2E_CINEMATIC_MERCHANT.filter.sortPriceDesc")}</option>
-                <option value="levelAsc">${game.i18n.localize("PF2E_CINEMATIC_MERCHANT.filter.sortLevelAsc")}</option>
-                <option value="levelDesc">${game.i18n.localize("PF2E_CINEMATIC_MERCHANT.filter.sortLevelDesc")}</option>
-                <option value="nameAsc">${game.i18n.localize("PF2E_CINEMATIC_MERCHANT.filter.sortNameAsc")}</option>
-              </select>
-              <label class="pf2e-cd-mer-filter-toggle">
-                <input type="checkbox" name="mer-affordable" />
-                <span>${game.i18n.localize("PF2E_CINEMATIC_MERCHANT.filter.affordable")}</span>
-              </label>
-              <label class="pf2e-cd-mer-filter-toggle">
-                <input type="checkbox" name="mer-wishlist" />
-                <span><i class="fa-solid fa-bookmark"></i> ${game.i18n.localize("PF2E_CINEMATIC_MERCHANT.filter.wishlist")}</span>
-              </label>
+            <div class="pf2e-cd-mer-filters is-collapsed" hidden data-role="merchant-filters">
+              <div class="pf2e-cd-mer-filters-primary">
+                <input type="text" name="mer-search" placeholder="${game.i18n.localize("PF2E_CINEMATIC_MERCHANT.filter.search")}" />
+                <select name="mer-rarity">${rarOpts}</select>
+                <input type="number" name="mer-level-min" min="0" max="25" placeholder="${game.i18n.localize("PF2E_CINEMATIC_MERCHANT.filter.levelMin")}" />
+                <input type="number" name="mer-level-max" min="0" max="25" placeholder="${game.i18n.localize("PF2E_CINEMATIC_MERCHANT.filter.levelMax")}" />
+                <select name="mer-sort">
+                  <option value="default">${game.i18n.localize("PF2E_CINEMATIC_MERCHANT.filter.sortDefault")}</option>
+                  <option value="priceAsc">${game.i18n.localize("PF2E_CINEMATIC_MERCHANT.filter.sortPriceAsc")}</option>
+                  <option value="priceDesc">${game.i18n.localize("PF2E_CINEMATIC_MERCHANT.filter.sortPriceDesc")}</option>
+                  <option value="levelAsc">${game.i18n.localize("PF2E_CINEMATIC_MERCHANT.filter.sortLevelAsc")}</option>
+                  <option value="levelDesc">${game.i18n.localize("PF2E_CINEMATIC_MERCHANT.filter.sortLevelDesc")}</option>
+                  <option value="nameAsc">${game.i18n.localize("PF2E_CINEMATIC_MERCHANT.filter.sortNameAsc")}</option>
+                </select>
+                <label class="pf2e-cd-mer-filter-toggle">
+                  <input type="checkbox" name="mer-affordable" />
+                  <span>${game.i18n.localize("PF2E_CINEMATIC_MERCHANT.filter.affordable")}</span>
+                </label>
+                <label class="pf2e-cd-mer-filter-toggle">
+                  <input type="checkbox" name="mer-wishlist" />
+                  <span><i class="fa-solid fa-bookmark"></i> ${game.i18n.localize("PF2E_CINEMATIC_MERCHANT.filter.wishlist")}</span>
+                </label>
+                <button type="button" class="pf2e-cd-mer-filters-toggle" data-action="filters-toggle">
+                  <i class="fa-solid fa-chevron-down"></i>
+                  <span>${game.i18n.localize("PF2E_CINEMATIC_MERCHANT.picker.filtersToggle")}</span>
+                </button>
+              </div>
+              <div class="pf2e-cd-mer-filters-advanced" data-role="merchant-filters-advanced" hidden>
+                <select name="mer-usage" data-empty-label="${game.i18n.localize("PF2E_CINEMATIC_MERCHANT.filter.usageAny")}" hidden></select>
+                <select name="mer-group" data-empty-label="${game.i18n.localize("PF2E_CINEMATIC_MERCHANT.filter.groupAny")}" hidden></select>
+                <select name="mer-bulk" hidden>
+                  <option value="all">${game.i18n.localize("PF2E_CINEMATIC_MERCHANT.filter.bulkAny")}</option>
+                  <option value="0">${game.i18n.localize("PF2E_CINEMATIC_MERCHANT.filter.bulk0")}</option>
+                  <option value="L">${game.i18n.localize("PF2E_CINEMATIC_MERCHANT.filter.bulkLight")}</option>
+                  <option value="1">1</option>
+                  <option value="2">2</option>
+                  <option value="3">3</option>
+                  <option value="4plus">${game.i18n.localize("PF2E_CINEMATIC_MERCHANT.filter.bulk4plus")}</option>
+                </select>
+                <select name="mer-magical" hidden>
+                  <option value="all">${game.i18n.localize("PF2E_CINEMATIC_MERCHANT.filter.magicalAny")}</option>
+                  <option value="yes">${game.i18n.localize("PF2E_CINEMATIC_MERCHANT.filter.magicalYes")}</option>
+                  <option value="no">${game.i18n.localize("PF2E_CINEMATIC_MERCHANT.filter.magicalNo")}</option>
+                </select>
+              </div>
             </div>
             <div class="pf2e-cd-mer-items"></div>
             <div class="pf2e-cd-mer-empty" hidden>${game.i18n.localize("PF2E_CINEMATIC_MERCHANT.window.empty")}</div>

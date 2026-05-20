@@ -2,6 +2,14 @@
 // GM-only. Filters by name, category, rarity, level, source pack.
 
 import { MODULE_ID, formatCopper, priceToCopper, normalizeMerchantType } from "./merchant-store.js";
+import { makeDraggable } from "./draggable.js";
+
+function prettifySlug(slug) {
+  if (!slug) return "";
+  return String(slug)
+    .replace(/-/g, " ")
+    .replace(/\b\w/g, ch => ch.toUpperCase());
+}
 
 const ALLOWED_TYPES = new Set([
   "weapon", "armor", "shield", "consumable", "equipment", "treasure", "backpack",
@@ -71,6 +79,13 @@ class CompendiumPicker {
       levelMin: null,
       levelMax: null,
       pack: "all",
+      usage: "all",
+      group: "all",
+      bulk: "all",
+      magical: "all",
+      traits: "",     // comma-separated trait list (any-of match)
+      priceMaxGp: "", // empty = unbounded
+      stackGroup: "all", // ammo stack group: arrows, bolts, etc.
     };
     this.root = null;
     this.refs = {};
@@ -104,6 +119,7 @@ class CompendiumPicker {
         const idx = await pack.getIndex({ fields: [
           "system.price", "system.level", "system.traits",
           "system.category", "system.consumableType", "system.stackGroup",
+          "system.usage", "system.group", "system.bulk",
           "type", "img",
         ]});
         const list = [...idx]
@@ -127,11 +143,39 @@ class CompendiumPicker {
         .concat(packOpts.map(p => `<option value="${escapeHTML(p.id)}">${escapeHTML(p.label)} (${p.count})</option>`));
       this.refs.packSel.innerHTML = opts.join("");
     }
+
+    // Populate usage + group filters from the union of all indexed items.
+    const usages = new Set();
+    const groups = new Set();
+    for (const it of this.allItems) {
+      const u = it.system?.usage?.value;
+      if (u) usages.add(u);
+      const g = it.system?.group;
+      if (g) groups.add(g);
+    }
+    const fillSel = (sel, values, anyLabel) => {
+      if (!sel) return;
+      const opts = [`<option value="all">${escapeHTML(anyLabel)}</option>`];
+      for (const v of [...values].sort((a, b) => a.localeCompare(b))) {
+        opts.push(`<option value="${escapeHTML(v)}">${escapeHTML(prettifySlug(v))}</option>`);
+      }
+      sel.innerHTML = opts.join("");
+    };
+    fillSel(this.refs.usageSel, usages, t("PF2E_CINEMATIC_MERCHANT.filter.usageAny"));
+    fillSel(this.refs.groupSel, groups, t("PF2E_CINEMATIC_MERCHANT.filter.groupAny"));
+
     this._loading = false;
   }
 
   _filterItems() {
     const f = this.filters;
+    // Pre-parse the comma trait list once per filter pass.
+    const wantedTraits = f.traits
+      ? f.traits.split(",").map(s => s.trim().toLowerCase()).filter(Boolean)
+      : null;
+    const priceMaxCp = f.priceMaxGp === "" || f.priceMaxGp == null
+      ? null
+      : Math.max(0, Number(f.priceMaxGp) * 100);
     this.filtered = this.allItems.filter(it => {
       if (f.pack !== "all" && it.packId !== f.pack) return false;
       if (f.search && !it.name.toLowerCase().includes(f.search)) return false;
@@ -141,6 +185,35 @@ class CompendiumPicker {
       const lvl = Number(it.system?.level?.value ?? 0);
       if (f.levelMin != null && lvl < f.levelMin) return false;
       if (f.levelMax != null && lvl > f.levelMax) return false;
+      if (f.usage !== "all" && (it.system?.usage?.value ?? "") !== f.usage) return false;
+      if (f.group !== "all" && (it.system?.group ?? "") !== f.group) return false;
+      if (f.bulk !== "all") {
+        const bv = Number(it.system?.bulk?.value ?? 0);
+        let ok = false;
+        switch (f.bulk) {
+          case "0":     ok = bv === 0; break;
+          case "L":     ok = bv > 0 && bv < 1; break;
+          case "1":     ok = bv >= 1 && bv < 2; break;
+          case "2":     ok = bv >= 2 && bv < 3; break;
+          case "3":     ok = bv >= 3 && bv < 4; break;
+          case "4plus": ok = bv >= 4; break;
+        }
+        if (!ok) return false;
+      }
+      if (f.magical !== "all") {
+        const traits = it.system?.traits?.value ?? [];
+        const isMagical = Array.isArray(traits) && traits.includes("magical");
+        if (f.magical === "yes" && !isMagical) return false;
+        if (f.magical === "no" && isMagical) return false;
+      }
+      if (wantedTraits?.length) {
+        const traits = (it.system?.traits?.value ?? []).map(s => String(s).toLowerCase());
+        if (!wantedTraits.every(t => traits.includes(t))) return false;
+      }
+      if (priceMaxCp != null) {
+        const cp = priceToCopper(it.system?.price);
+        if (cp > priceMaxCp) return false;
+      }
       return true;
     }).sort((a, b) => {
       const lvlA = Number(a.system?.level?.value ?? 0);
@@ -252,6 +325,15 @@ class CompendiumPicker {
       levelMin:    root.querySelector("[name=picker-level-min]"),
       levelMax:    root.querySelector("[name=picker-level-max]"),
       packSel:     root.querySelector("[name=picker-pack]"),
+      usageSel:    root.querySelector("[name=picker-usage]"),
+      groupSel:    root.querySelector("[name=picker-group]"),
+      bulkSel:     root.querySelector("[name=picker-bulk]"),
+      magicalSel:  root.querySelector("[name=picker-magical]"),
+      traitsIn:    root.querySelector("[name=picker-traits]"),
+      priceMaxIn:  root.querySelector("[name=picker-price-max]"),
+      filtersWrap: root.querySelector("[data-role=picker-filters]"),
+      filtersAdv:  root.querySelector("[data-role=picker-filters-advanced]"),
+      filtersToggle: root.querySelector("[data-action=picker-filters-toggle]"),
     };
 
     this.refs.title.textContent = game.i18n.format(
@@ -259,6 +341,8 @@ class CompendiumPicker {
       { actor: this.actor.name }
     );
     this.refs.closeBtn.addEventListener("click", () => this.close());
+
+    makeDraggable(this.refs.frame, this.refs.title, "compendium-picker");
 
     const debounced = this._debounce(() => this._refreshList(), 120);
     this.refs.search.addEventListener("input", () => { this.filters.search = this.refs.search.value.trim().toLowerCase(); debounced(); });
@@ -273,6 +357,20 @@ class CompendiumPicker {
     this.refs.levelMin.addEventListener("input", () => { const v = this.refs.levelMin.value; this.filters.levelMin = v === "" ? null : Number(v); debounced(); });
     this.refs.levelMax.addEventListener("input", () => { const v = this.refs.levelMax.value; this.filters.levelMax = v === "" ? null : Number(v); debounced(); });
     this.refs.packSel.addEventListener("change", () => { this.filters.pack = this.refs.packSel.value; this._refreshList(); });
+
+    // Advanced filters
+    this.refs.usageSel?.addEventListener("change", () => { this.filters.usage = this.refs.usageSel.value; this._refreshList(); });
+    this.refs.groupSel?.addEventListener("change", () => { this.filters.group = this.refs.groupSel.value; this._refreshList(); });
+    this.refs.bulkSel?.addEventListener("change", () => { this.filters.bulk = this.refs.bulkSel.value; this._refreshList(); });
+    this.refs.magicalSel?.addEventListener("change", () => { this.filters.magical = this.refs.magicalSel.value; this._refreshList(); });
+    this.refs.traitsIn?.addEventListener("input", () => { this.filters.traits = this.refs.traitsIn.value.trim(); debounced(); });
+    this.refs.priceMaxIn?.addEventListener("input", () => { this.filters.priceMaxGp = this.refs.priceMaxIn.value; debounced(); });
+    this.refs.filtersToggle?.addEventListener("click", () => {
+      const collapsed = this.refs.filtersWrap.classList.toggle("is-collapsed");
+      this.refs.filtersAdv.hidden = collapsed;
+      const chev = this.refs.filtersToggle.querySelector("i");
+      if (chev) chev.className = collapsed ? "fa-solid fa-chevron-down" : "fa-solid fa-chevron-up";
+    });
 
     this.refs.selAllBtn.addEventListener("click", () => this._selectAllVisible());
     this.refs.selNoneBtn.addEventListener("click", () => { this.selected.clear(); this._refreshList(); });
@@ -403,12 +501,38 @@ class CompendiumPicker {
           <button type="button" class="pf2e-cd-mer-cat-chip-toggle" data-action="picker-cat-all"><i class="fa-solid fa-check-double"></i> ${escapeHTML(t("PF2E_CINEMATIC_MERCHANT.picker.allCats"))}</button>
           <button type="button" class="pf2e-cd-mer-cat-chip-toggle" data-action="picker-cat-none"><i class="fa-solid fa-eraser"></i> ${escapeHTML(t("PF2E_CINEMATIC_MERCHANT.picker.noCats"))}</button>
         </div>
-        <div class="pf2e-cd-mer-picker-filters">
-          <input type="text" name="picker-search" placeholder="${escapeHTML(t("PF2E_CINEMATIC_MERCHANT.filter.search"))}" />
-          <select name="picker-rarity">${rarOpts}</select>
-          <input type="number" name="picker-level-min" min="0" max="25" placeholder="${escapeHTML(t("PF2E_CINEMATIC_MERCHANT.filter.levelMin"))}" />
-          <input type="number" name="picker-level-max" min="0" max="25" placeholder="${escapeHTML(t("PF2E_CINEMATIC_MERCHANT.filter.levelMax"))}" />
-          <select name="picker-pack"><option value="all">${escapeHTML(t("PF2E_CINEMATIC_MERCHANT.picker.allPacks"))}</option></select>
+        <div class="pf2e-cd-mer-picker-filters is-collapsed" data-role="picker-filters">
+          <div class="pf2e-cd-mer-picker-filters-primary">
+            <input type="text" name="picker-search" placeholder="${escapeHTML(t("PF2E_CINEMATIC_MERCHANT.filter.search"))}" />
+            <select name="picker-rarity">${rarOpts}</select>
+            <input type="number" name="picker-level-min" min="0" max="25" placeholder="${escapeHTML(t("PF2E_CINEMATIC_MERCHANT.filter.levelMin"))}" />
+            <input type="number" name="picker-level-max" min="0" max="25" placeholder="${escapeHTML(t("PF2E_CINEMATIC_MERCHANT.filter.levelMax"))}" />
+            <select name="picker-pack"><option value="all">${escapeHTML(t("PF2E_CINEMATIC_MERCHANT.picker.allPacks"))}</option></select>
+            <button type="button" class="pf2e-cd-mer-picker-filters-toggle" data-action="picker-filters-toggle">
+              <i class="fa-solid fa-chevron-down"></i>
+              <span>${escapeHTML(t("PF2E_CINEMATIC_MERCHANT.picker.filtersToggle"))}</span>
+            </button>
+          </div>
+          <div class="pf2e-cd-mer-picker-filters-advanced" data-role="picker-filters-advanced" hidden>
+            <select name="picker-usage" data-empty-label="${escapeHTML(t("PF2E_CINEMATIC_MERCHANT.filter.usageAny"))}"></select>
+            <select name="picker-group" data-empty-label="${escapeHTML(t("PF2E_CINEMATIC_MERCHANT.filter.groupAny"))}"></select>
+            <select name="picker-bulk">
+              <option value="all">${escapeHTML(t("PF2E_CINEMATIC_MERCHANT.filter.bulkAny"))}</option>
+              <option value="0">${escapeHTML(t("PF2E_CINEMATIC_MERCHANT.filter.bulk0"))}</option>
+              <option value="L">${escapeHTML(t("PF2E_CINEMATIC_MERCHANT.filter.bulkLight"))}</option>
+              <option value="1">1</option>
+              <option value="2">2</option>
+              <option value="3">3</option>
+              <option value="4plus">${escapeHTML(t("PF2E_CINEMATIC_MERCHANT.filter.bulk4plus"))}</option>
+            </select>
+            <select name="picker-magical">
+              <option value="all">${escapeHTML(t("PF2E_CINEMATIC_MERCHANT.filter.magicalAny"))}</option>
+              <option value="yes">${escapeHTML(t("PF2E_CINEMATIC_MERCHANT.filter.magicalYes"))}</option>
+              <option value="no">${escapeHTML(t("PF2E_CINEMATIC_MERCHANT.filter.magicalNo"))}</option>
+            </select>
+            <input type="text" name="picker-traits" placeholder="${escapeHTML(t("PF2E_CINEMATIC_MERCHANT.filter.traitsPlaceholder"))}" />
+            <input type="number" name="picker-price-max" min="0" step="0.1" placeholder="${escapeHTML(t("PF2E_CINEMATIC_MERCHANT.filter.priceMaxGp"))}" />
+          </div>
         </div>
         <div class="pf2e-cd-mer-picker-actions">
           <button type="button" data-action="picker-select-all"><i class="fa-solid fa-check-double"></i> ${escapeHTML(t("PF2E_CINEMATIC_MERCHANT.picker.selectAll"))}</button>

@@ -1,6 +1,7 @@
 // Side-by-side comparison modal for 2-3 items.
 
 import { MODULE_ID, effectiveItemPriceCp, formatCopper } from "./merchant-store.js";
+import { makeDraggable } from "./draggable.js";
 
 let _activeModal = null;
 
@@ -137,6 +138,11 @@ class CompareModal {
     this.root = root;
     root.querySelector("[data-action=close]").addEventListener("click", () => this.close());
     root.querySelector(".pf2e-cd-mer-compare-vignette").addEventListener("click", () => this.close());
+    makeDraggable(
+      root.querySelector(".pf2e-cd-mer-compare-frame"),
+      root.querySelector(".pf2e-cd-mer-compare-header"),
+      "compare-modal"
+    );
     for (const btn of root.querySelectorAll("[data-action=remove]")) {
       btn.addEventListener("click", () => {
         const id = btn.dataset.itemId;
