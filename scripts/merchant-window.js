@@ -25,6 +25,7 @@ import {
   setItemDailyOfferPct,
   getMerchantDailyOffers,
   recordMerchantTransaction,
+  recordMerchantTransactions,
   getMerchantTransactionLog,
   clearMerchantTransactionLog,
   getMerchantCharacterDiscounts,
@@ -891,8 +892,10 @@ export class MerchantWindow {
       ui.notifications?.warn(game.i18n.localize("PF2E_CINEMATIC_MERCHANT.warn.notEnoughGold"));
       throw new Error("not_enough_gold");
     }
+    let usedDirectPath = false;
     try {
       if (this._hasMerchantOwnership()) {
+        usedDirectPath = true;
         await deductCoins(this.viewer, totalCp);
         await addCoins(this.actor, totalCp);
         const itemsToCreate = [];
@@ -919,7 +922,26 @@ export class MerchantWindow {
       } else {
         throw new Error("no_permission_no_gm");
       }
-      for (const l of lines) this._logTransaction("buy", l.item.name, l.qty, l.lineCp, { img: l.item.img });
+      // Cart-specific logging: avoid the race condition where each per-line
+      // recordMerchantTransaction reads the same starting log + appends 1 +
+      // writes back in parallel, leaving only the last entry persisted.
+      // Push to session log immediately, then batch-persist in ONE update.
+      const when = Date.now();
+      for (const l of lines) {
+        this.transactions.push({ kind: "buy", name: l.item.name, qty: l.qty, cp: l.lineCp, when });
+      }
+      // Skip persistent write when the GM relay handled it — gm-ops logs
+      // each line server-side already.
+      if (usedDirectPath) {
+        await recordMerchantTransactions(this.actor, lines.map(l => ({
+          kind: "buy",
+          characterId: this.viewer.id, characterName: this.viewer.name,
+          userName: game.user?.name,
+          itemName: l.item.name, itemImg: l.item.img,
+          qty: l.qty, cp: l.lineCp,
+          when,
+        })));
+      }
       playBuy();
       const itemCount = lines.reduce((n, l) => n + l.qty, 0);
       const distinct = lines.length;
