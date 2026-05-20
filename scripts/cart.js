@@ -204,6 +204,30 @@ class CartDrawer {
         this._render();
       });
     }
+    // Direct qty input — commits on Enter or blur so the user can type 12
+    // without the row re-rendering after every digit (which would steal focus).
+    for (const inp of list.querySelectorAll("[data-role=line-qty]")) {
+      const commit = () => {
+        const itemId = inp.dataset.itemId;
+        const item = this.merchant.items.get(itemId);
+        const max = Math.max(1, Number(item?.system?.quantity ?? 1));
+        const raw = Number(inp.value);
+        if (!Number.isFinite(raw) || raw <= 0) {
+          this.cart.remove(itemId);
+        } else {
+          this.cart.set(itemId, Math.min(max, Math.floor(raw)));
+        }
+        this.onChanged?.();
+        this._render();
+      };
+      inp.addEventListener("change", commit);
+      inp.addEventListener("blur", commit);
+      inp.addEventListener("keydown", (e) => {
+        if (e.key === "Enter") { e.preventDefault(); commit(); }
+      });
+      // Stop wheel events from accidentally changing qty when scrolling the cart
+      inp.addEventListener("wheel", (e) => { if (document.activeElement !== inp) e.preventDefault(); }, { passive: false });
+    }
   }
 
   _adjust(itemId, delta) {
@@ -229,7 +253,11 @@ class CartDrawer {
         </div>
         <div class="pf2e-cd-mer-cart-row-qty">
           <button type="button" data-action="line-minus" data-item-id="${item.id}">−</button>
-          <span>${qty}</span>
+          <input type="number"
+                 class="pf2e-cd-mer-cart-row-qty-input"
+                 data-role="line-qty"
+                 data-item-id="${item.id}"
+                 min="1" max="${stockQty}" step="1" value="${qty}" />
           <button type="button" data-action="line-plus" data-item-id="${item.id}" ${qty >= stockQty ? "disabled" : ""}>+</button>
         </div>
         <div class="pf2e-cd-mer-cart-row-line">${escapeHTML(formatCopper(lineCp))}</div>

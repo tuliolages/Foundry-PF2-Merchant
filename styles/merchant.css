@@ -4643,13 +4643,43 @@ dialog.pf2e-cd-mer-dialog select:focus {
   font-weight: 700;
   font-family: Georgia, serif;
 }
+/* Direct qty input — same visual width as the previous <span> so the row
+   layout doesn't shift when the row first renders, plus the +/- buttons
+   stay anchored next to it. */
+.pf2e-cd-mer-cart-row-qty-input {
+  width: 48px !important;
+  text-align: center;
+  font-family: Georgia, serif;
+  font-size: 13px !important;
+  font-weight: 700;
+  padding: 2px 4px !important;
+  border: 1px solid var(--pf2e-mer-gold) !important;
+  border-radius: 2px !important;
+  background: #fff8e8 !important;
+  color: var(--pf2e-mer-text, #1a0e05) !important;
+  -moz-appearance: textfield;
+}
+.pf2e-cd-mer-cart-row-qty-input::-webkit-inner-spin-button,
+.pf2e-cd-mer-cart-row-qty-input::-webkit-outer-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+.pf2e-cd-mer-cart-row-qty-input:focus {
+  outline: none !important;
+  border-color: var(--pf2e-mer-red) !important;
+  box-shadow: 0 0 0 2px rgba(94, 0, 0, 0.18) !important;
+}
+/* Fixed-width line total so changing qty doesn't push the +/- buttons
+   around as the gp/sp/cp text varies in length. */
 .pf2e-cd-mer-cart-row-line {
   font-family: Georgia, serif;
   font-weight: 700;
   font-size: 13px;
   color: var(--pf2e-mer-red);
-  min-width: 70px;
+  flex: 0 0 130px;
+  width: 130px;
   text-align: right;
+  white-space: nowrap;
 }
 .pf2e-cd-mer-cart-row-remove {
   width: 24px; height: 24px;
