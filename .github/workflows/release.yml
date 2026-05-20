@@ -15,23 +15,25 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Read version from module.json
-        id: ver
+      - name: Read version + id from module.json
+        id: meta
         run: |
           VERSION=$(node -p "require('./module.json').version")
+          MODULE_ID=$(node -p "require('./module.json').id")
           echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          echo "module_id=$MODULE_ID" >> "$GITHUB_OUTPUT"
 
       - name: Sanity-check the tag matches module.json
         run: |
           TAG_VERSION="${GITHUB_REF_NAME#v}"
-          if [ "$TAG_VERSION" != "${{ steps.ver.outputs.version }}" ]; then
-            echo "::error::Tag $GITHUB_REF_NAME does not match module.json version ${{ steps.ver.outputs.version }}"
+          if [ "$TAG_VERSION" != "${{ steps.meta.outputs.version }}" ]; then
+            echo "::error::Tag $GITHUB_REF_NAME does not match module.json version ${{ steps.meta.outputs.version }}"
             exit 1
           fi
 
-      - name: Build module.zip
+      - name: Build module zip
         run: |
-          zip -r module.zip \
+          zip -r "${{ steps.meta.outputs.module_id }}.zip" \
             module.json \
             LICENSE \
             README.md \
@@ -45,11 +47,32 @@ jobs:
             -x "*.DS_Store" \
             -x "node_modules/*"
 
+      - name: Extract latest-version notes from CHANGELOG
+        id: notes
+        run: |
+          # Pull the section between the latest `## [version]` heading and
+          # the next `## ` (or end-of-file). Falls back to a single-line
+          # summary if the file has no such heading.
+          VERSION="${{ steps.meta.outputs.version }}"
+          NOTES=$(awk -v ver="$VERSION" '
+            $0 ~ "^## \\[" ver "\\]" { keep=1; next }
+            keep && /^## / { exit }
+            keep { print }
+          ' CHANGELOG.md)
+          if [ -z "$NOTES" ]; then
+            NOTES="Release v$VERSION. See CHANGELOG.md for details."
+          fi
+          {
+            echo "body<<EOF"
+            echo "$NOTES"
+            echo "EOF"
+          } >> "$GITHUB_OUTPUT"
+
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
-          name: "v${{ steps.ver.outputs.version }}"
-          body_path: CHANGELOG.md
+          name: "v${{ steps.meta.outputs.version }}"
+          body: ${{ steps.notes.outputs.body }}
           files: |
             module.json
-            module.zip
+            ${{ steps.meta.outputs.module_id }}.zip
