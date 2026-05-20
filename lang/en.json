@@ -111,6 +111,10 @@
   "PF2E_CINEMATIC_MERCHANT.picker.filtersToggle": "Filters",
   "PF2E_CINEMATIC_MERCHANT.picker.filtersExpand": "Show all filters",
   "PF2E_CINEMATIC_MERCHANT.picker.filtersCollapse": "Collapse filters",
+  "PF2E_CINEMATIC_MERCHANT.picker.qtyRangeHint": "Import quantity: a random integer between min and max (inclusive)",
+  "PF2E_CINEMATIC_MERCHANT.picker.qtyDefault": "Qty",
+  "PF2E_CINEMATIC_MERCHANT.picker.qtyDefaultHint": "Default quantity for visible items — click the arrow button to apply these values to every filtered row.",
+  "PF2E_CINEMATIC_MERCHANT.picker.qtyApplyAll": "Apply to all visible items",
   "PF2E_CINEMATIC_MERCHANT.tile.linkCancel": "Cancel",
   "PF2E_CINEMATIC_MERCHANT.tile.noLootActors": "No Loot actors found. Create one in the Actors directory first.",
 

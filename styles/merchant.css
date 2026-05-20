@@ -1845,14 +1845,187 @@
 }
 
 .pf2e-cd-mer-picker-filters {
-  display: grid;
-  grid-template-columns: 2fr 1fr 70px 70px 1.2fr;
+  display: flex;
+  flex-direction: column;
   gap: 6px;
   margin: 0 18px 8px;
-  padding: 8px;
+  padding: 8px 10px;
   background: rgba(120, 90, 40, 0.08);
   border: 1px solid rgba(120, 90, 40, 0.3);
   border-radius: 3px;
+}
+.pf2e-cd-mer-picker-filters-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  align-items: center;
+}
+.pf2e-cd-mer-picker-filters .pf2e-cd-mer-grow {
+  flex: 1 1 200px;
+  min-width: 140px;
+}
+.pf2e-cd-mer-picker-filters input[type=number] {
+  width: 90px;
+  flex: 0 0 auto;
+}
+.pf2e-cd-mer-picker-filters input[type=text],
+.pf2e-cd-mer-picker-filters select {
+  flex: 1 1 140px;
+  min-width: 120px;
+}
+.pf2e-cd-mer-picker-filters-advanced { width: 100%; }
+.pf2e-cd-mer-picker-qty-default {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-family: "Eczar", Georgia, serif;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.5px;
+  text-transform: uppercase;
+  color: var(--pf2e-mer-red);
+  background: rgba(255, 247, 230, 0.55);
+  border: 1px solid var(--pf2e-mer-gold);
+  border-radius: 3px;
+  padding: 2px 6px;
+}
+.pf2e-cd-mer-picker-qty-default input[type=number] {
+  width: 52px !important;
+  flex: 0 0 52px !important;
+  min-width: 0 !important;
+  text-align: center;
+  padding: 2px 4px;
+}
+.pf2e-cd-mer-picker-qty-default span:first-of-type {
+  margin-right: 2px;
+}
+.pf2e-cd-mer-picker-qty-default button {
+  width: 22px;
+  height: 22px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid var(--pf2e-mer-gold);
+  border-radius: 2px;
+  background: linear-gradient(180deg, #5a4818 0%, var(--pf2e-mer-gold) 100%);
+  color: var(--pf2e-mer-cream-warm);
+  cursor: pointer;
+  margin-left: 2px;
+  padding: 0;
+}
+.pf2e-cd-mer-picker-qty-default button:hover {
+  background: linear-gradient(180deg, #7a6428 0%, #9c7a32 100%);
+}
+
+/* Per-row qty range inputs (between meta and price). */
+.pf2e-cd-mer-picker-row-qty {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  flex: 0 0 auto;
+  padding: 2px 4px;
+  background: rgba(255, 247, 230, 0.55);
+  border: 1px solid rgba(120, 90, 40, 0.4);
+  border-radius: 3px;
+}
+.pf2e-cd-mer-picker-row-qty input[type=number] {
+  width: 38px !important;
+  text-align: center;
+  padding: 2px 3px;
+  font-family: Georgia, serif;
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--pf2e-mer-text);
+  background: #fff8e8;
+  border: 1px solid var(--pf2e-mer-gold);
+  border-radius: 2px;
+}
+.pf2e-cd-mer-picker-row-qty span {
+  font-size: 10px;
+  color: rgba(50, 25, 10, 0.55);
+}
+/* Hide native number input spinners — too crowded at this size. */
+.pf2e-cd-mer-picker-row-qty input[type=number]::-webkit-inner-spin-button,
+.pf2e-cd-mer-picker-row-qty input[type=number]::-webkit-outer-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+.pf2e-cd-mer-picker-row-qty input[type=number] {
+  -moz-appearance: textfield;
+}
+
+/* === Universal parchment-style checkbox for all module dialogs.
+   Foundry V13's native checkbox renders as a black square that disappears on
+   our cream backgrounds — replace with a clear gold-bordered box plus a red
+   checkmark when checked. */
+.pf2e-cd-mer-dialog input[type=checkbox],
+.application.pf2e-cd-mer-dialog input[type=checkbox],
+dialog.pf2e-cd-mer-dialog input[type=checkbox],
+.pf2e-cd-mer-hitzone-alpha-toggle input[type=checkbox],
+.pf2e-cd-mer-random-replace input[type=checkbox],
+.pf2e-cd-mer-greeting-sounds-field input[type=checkbox] {
+  -webkit-appearance: none !important;
+  appearance: none !important;
+  width: 18px !important;
+  height: 18px !important;
+  flex: 0 0 18px !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  background: #fff8e8 !important;
+  background-color: #fff8e8 !important;
+  border: 1px solid var(--pf2e-mer-gold) !important;
+  border-radius: 2px !important;
+  cursor: pointer;
+  position: relative;
+  box-shadow: inset 0 0 0 1px rgba(120, 90, 40, 0.2);
+  transition: background-color 140ms ease, box-shadow 140ms ease;
+}
+.pf2e-cd-mer-dialog input[type=checkbox]:hover,
+.application.pf2e-cd-mer-dialog input[type=checkbox]:hover,
+dialog.pf2e-cd-mer-dialog input[type=checkbox]:hover,
+.pf2e-cd-mer-hitzone-alpha-toggle input[type=checkbox]:hover,
+.pf2e-cd-mer-random-replace input[type=checkbox]:hover,
+.pf2e-cd-mer-greeting-sounds-field input[type=checkbox]:hover {
+  border-color: var(--pf2e-mer-red) !important;
+  box-shadow: inset 0 0 0 1px rgba(94, 0, 0, 0.2), 0 0 0 2px rgba(94, 0, 0, 0.1);
+}
+.pf2e-cd-mer-dialog input[type=checkbox]:checked,
+.application.pf2e-cd-mer-dialog input[type=checkbox]:checked,
+dialog.pf2e-cd-mer-dialog input[type=checkbox]:checked,
+.pf2e-cd-mer-hitzone-alpha-toggle input[type=checkbox]:checked,
+.pf2e-cd-mer-random-replace input[type=checkbox]:checked,
+.pf2e-cd-mer-greeting-sounds-field input[type=checkbox]:checked {
+  background: var(--pf2e-mer-red) !important;
+  background-color: var(--pf2e-mer-red) !important;
+  border-color: var(--pf2e-mer-red) !important;
+}
+.pf2e-cd-mer-dialog input[type=checkbox]:checked::after,
+.application.pf2e-cd-mer-dialog input[type=checkbox]:checked::after,
+dialog.pf2e-cd-mer-dialog input[type=checkbox]:checked::after,
+.pf2e-cd-mer-hitzone-alpha-toggle input[type=checkbox]:checked::after,
+.pf2e-cd-mer-random-replace input[type=checkbox]:checked::after,
+.pf2e-cd-mer-greeting-sounds-field input[type=checkbox]:checked::after {
+  content: "✓";
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--pf2e-mer-cream-warm);
+  font-size: 13px;
+  font-weight: 900;
+  line-height: 1;
+}
+/* Layout for the alpha-toggle label specifically (the one the user flagged) */
+.pf2e-cd-mer-hitzone-alpha-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 10px;
+  font-family: "Eczar", Georgia, serif;
+  font-size: 12px;
+  color: var(--pf2e-mer-text);
+  cursor: pointer;
 }
 .pf2e-cd-mer-picker-filters input,
 .pf2e-cd-mer-picker-filters select {

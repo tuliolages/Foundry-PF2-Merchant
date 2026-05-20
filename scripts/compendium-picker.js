@@ -72,6 +72,7 @@ class CompendiumPicker {
     this.allItems = [];      // flat array { name, _id, type, system, img, packId, packName }
     this.filtered = [];
     this.selected = new Set(); // "packId.itemId"
+    this.qtyByKey = new Map(); // key -> {min, max}
     this.filters = {
       search: "",
       categories: new Set(CATEGORY_CHIPS.map(c => c.value)), // all enabled by default
@@ -252,6 +253,31 @@ class CompendiumPicker {
           }
         });
       }
+      // Wire qty inputs — write back into qtyByKey + auto-select the row when
+      // the user changes a qty (clear sign they want to import this one).
+      for (const inp of this.refs.list.querySelectorAll("[data-role=qty-min], [data-role=qty-max]")) {
+        inp.addEventListener("click", (e) => e.stopPropagation());
+        inp.addEventListener("input", (e) => {
+          const key = inp.dataset.key;
+          const cur = this.qtyByKey.get(key) ?? { min: 1, max: 1 };
+          const v = Math.max(1, Math.min(999, Number(inp.value) || 1));
+          if (inp.dataset.role === "qty-min") {
+            cur.min = v;
+            if (cur.max < cur.min) cur.max = cur.min;
+          } else {
+            cur.max = v;
+            if (cur.min > cur.max) cur.min = cur.max;
+          }
+          this.qtyByKey.set(key, cur);
+          // Auto-select the row so they don't have to also check the box.
+          if (!this.selected.has(key)) {
+            this.selected.add(key);
+            const cb = inp.closest(".pf2e-cd-mer-picker-row")?.querySelector(".pf2e-cd-mer-picker-row-cb");
+            if (cb) cb.checked = true;
+            this._refreshFooter();
+          }
+        });
+      }
     }
     this._refreshFooter();
   }
@@ -262,6 +288,7 @@ class CompendiumPicker {
     const lvl = Number(it.system?.level?.value ?? 0);
     const rarity = it.system?.traits?.rarity ?? "common";
     const priceCp = priceToCopper(it.system?.price);
+    const qty = this.qtyByKey.get(key) ?? { min: 1, max: 1 };
     return `
       <label class="pf2e-cd-mer-picker-row rarity-${rarity}">
         <input type="checkbox" class="pf2e-cd-mer-picker-row-cb" data-key="${escapeHTML(key)}" ${checked} />
@@ -274,6 +301,11 @@ class CompendiumPicker {
             <span class="tag tag-level">L ${lvl}</span>
             <span class="tag tag-pack">${escapeHTML(it.packName)}</span>
           </div>
+        </div>
+        <div class="pf2e-cd-mer-picker-row-qty" title="${escapeHTML(t("PF2E_CINEMATIC_MERCHANT.picker.qtyRangeHint"))}">
+          <input type="number" data-role="qty-min" data-key="${escapeHTML(key)}" min="1" max="999" value="${qty.min}" />
+          <span>–</span>
+          <input type="number" data-role="qty-max" data-key="${escapeHTML(key)}" min="1" max="999" value="${qty.max}" />
         </div>
         <div class="pf2e-cd-mer-picker-row-price">${formatCopper(priceCp)}</div>
       </label>
@@ -334,6 +366,9 @@ class CompendiumPicker {
       filtersWrap: root.querySelector("[data-role=picker-filters]"),
       filtersAdv:  root.querySelector("[data-role=picker-filters-advanced]"),
       filtersToggle: root.querySelector("[data-action=picker-filters-toggle]"),
+      qtyDefMinIn: root.querySelector("[name=picker-qty-default-min]"),
+      qtyDefMaxIn: root.querySelector("[name=picker-qty-default-max]"),
+      qtyApplyBtn: root.querySelector("[data-action=picker-qty-apply-all]"),
     };
 
     this.refs.title.textContent = game.i18n.format(
@@ -370,6 +405,17 @@ class CompendiumPicker {
       this.refs.filtersAdv.hidden = collapsed;
       const chev = this.refs.filtersToggle.querySelector("i");
       if (chev) chev.className = collapsed ? "fa-solid fa-chevron-down" : "fa-solid fa-chevron-up";
+    });
+    this.refs.qtyApplyBtn?.addEventListener("click", () => {
+      const dMin = Math.max(1, Math.min(999, Number(this.refs.qtyDefMinIn?.value) || 1));
+      const dMaxRaw = Math.max(1, Math.min(999, Number(this.refs.qtyDefMaxIn?.value) || 1));
+      const dMax = Math.max(dMin, dMaxRaw);
+      // Apply to every currently visible (filtered) row.
+      for (const it of this.filtered) {
+        const key = `${it.packId}.${it._id ?? it.id}`;
+        this.qtyByKey.set(key, { min: dMin, max: dMax });
+      }
+      this._refreshList();
     });
 
     this.refs.selAllBtn.addEventListener("click", () => this._selectAllVisible());
@@ -442,9 +488,19 @@ class CompendiumPicker {
           }
           return out;
         });
-        for (const d of docs) {
+        const docMap = new Map(docs.map(d => [d.id, d]));
+        for (const itemId of itemIds) {
+          const d = docMap.get(itemId);
           if (!d) continue;
-          allItemData.push(d.toObject());
+          const data = d.toObject();
+          // Apply per-row quantity range: random integer in [min, max] inclusive.
+          const range = this.qtyByKey.get(`${packId}.${itemId}`);
+          if (range && data.system?.quantity != null) {
+            const min = Math.max(1, range.min);
+            const max = Math.max(min, range.max);
+            data.system.quantity = min + Math.floor(Math.random() * (max - min + 1));
+          }
+          allItemData.push(data);
         }
       }
 
@@ -502,36 +558,51 @@ class CompendiumPicker {
           <button type="button" class="pf2e-cd-mer-cat-chip-toggle" data-action="picker-cat-none"><i class="fa-solid fa-eraser"></i> ${escapeHTML(t("PF2E_CINEMATIC_MERCHANT.picker.noCats"))}</button>
         </div>
         <div class="pf2e-cd-mer-picker-filters is-collapsed" data-role="picker-filters">
-          <div class="pf2e-cd-mer-picker-filters-primary">
-            <input type="text" name="picker-search" placeholder="${escapeHTML(t("PF2E_CINEMATIC_MERCHANT.filter.search"))}" />
-            <select name="picker-rarity">${rarOpts}</select>
-            <input type="number" name="picker-level-min" min="0" max="25" placeholder="${escapeHTML(t("PF2E_CINEMATIC_MERCHANT.filter.levelMin"))}" />
-            <input type="number" name="picker-level-max" min="0" max="25" placeholder="${escapeHTML(t("PF2E_CINEMATIC_MERCHANT.filter.levelMax"))}" />
-            <select name="picker-pack"><option value="all">${escapeHTML(t("PF2E_CINEMATIC_MERCHANT.picker.allPacks"))}</option></select>
+          <div class="pf2e-cd-mer-picker-filters-row">
+            <input type="text" name="picker-search" class="pf2e-cd-mer-grow" placeholder="${escapeHTML(t("PF2E_CINEMATIC_MERCHANT.filter.search"))}" />
             <button type="button" class="pf2e-cd-mer-picker-filters-toggle" data-action="picker-filters-toggle">
               <i class="fa-solid fa-chevron-down"></i>
               <span>${escapeHTML(t("PF2E_CINEMATIC_MERCHANT.picker.filtersToggle"))}</span>
             </button>
           </div>
+          <div class="pf2e-cd-mer-picker-filters-row">
+            <select name="picker-rarity">${rarOpts}</select>
+            <input type="number" name="picker-level-min" min="0" max="25" placeholder="${escapeHTML(t("PF2E_CINEMATIC_MERCHANT.filter.levelMin"))}" />
+            <input type="number" name="picker-level-max" min="0" max="25" placeholder="${escapeHTML(t("PF2E_CINEMATIC_MERCHANT.filter.levelMax"))}" />
+            <select name="picker-pack" class="pf2e-cd-mer-grow"><option value="all">${escapeHTML(t("PF2E_CINEMATIC_MERCHANT.picker.allPacks"))}</option></select>
+          </div>
           <div class="pf2e-cd-mer-picker-filters-advanced" data-role="picker-filters-advanced" hidden>
-            <select name="picker-usage" data-empty-label="${escapeHTML(t("PF2E_CINEMATIC_MERCHANT.filter.usageAny"))}"></select>
-            <select name="picker-group" data-empty-label="${escapeHTML(t("PF2E_CINEMATIC_MERCHANT.filter.groupAny"))}"></select>
-            <select name="picker-bulk">
-              <option value="all">${escapeHTML(t("PF2E_CINEMATIC_MERCHANT.filter.bulkAny"))}</option>
-              <option value="0">${escapeHTML(t("PF2E_CINEMATIC_MERCHANT.filter.bulk0"))}</option>
-              <option value="L">${escapeHTML(t("PF2E_CINEMATIC_MERCHANT.filter.bulkLight"))}</option>
-              <option value="1">1</option>
-              <option value="2">2</option>
-              <option value="3">3</option>
-              <option value="4plus">${escapeHTML(t("PF2E_CINEMATIC_MERCHANT.filter.bulk4plus"))}</option>
-            </select>
-            <select name="picker-magical">
-              <option value="all">${escapeHTML(t("PF2E_CINEMATIC_MERCHANT.filter.magicalAny"))}</option>
-              <option value="yes">${escapeHTML(t("PF2E_CINEMATIC_MERCHANT.filter.magicalYes"))}</option>
-              <option value="no">${escapeHTML(t("PF2E_CINEMATIC_MERCHANT.filter.magicalNo"))}</option>
-            </select>
-            <input type="text" name="picker-traits" placeholder="${escapeHTML(t("PF2E_CINEMATIC_MERCHANT.filter.traitsPlaceholder"))}" />
-            <input type="number" name="picker-price-max" min="0" step="0.1" placeholder="${escapeHTML(t("PF2E_CINEMATIC_MERCHANT.filter.priceMaxGp"))}" />
+            <div class="pf2e-cd-mer-picker-filters-row">
+              <select name="picker-usage" data-empty-label="${escapeHTML(t("PF2E_CINEMATIC_MERCHANT.filter.usageAny"))}"></select>
+              <select name="picker-group" data-empty-label="${escapeHTML(t("PF2E_CINEMATIC_MERCHANT.filter.groupAny"))}"></select>
+              <select name="picker-bulk">
+                <option value="all">${escapeHTML(t("PF2E_CINEMATIC_MERCHANT.filter.bulkAny"))}</option>
+                <option value="0">${escapeHTML(t("PF2E_CINEMATIC_MERCHANT.filter.bulk0"))}</option>
+                <option value="L">${escapeHTML(t("PF2E_CINEMATIC_MERCHANT.filter.bulkLight"))}</option>
+                <option value="1">1</option>
+                <option value="2">2</option>
+                <option value="3">3</option>
+                <option value="4plus">${escapeHTML(t("PF2E_CINEMATIC_MERCHANT.filter.bulk4plus"))}</option>
+              </select>
+              <select name="picker-magical">
+                <option value="all">${escapeHTML(t("PF2E_CINEMATIC_MERCHANT.filter.magicalAny"))}</option>
+                <option value="yes">${escapeHTML(t("PF2E_CINEMATIC_MERCHANT.filter.magicalYes"))}</option>
+                <option value="no">${escapeHTML(t("PF2E_CINEMATIC_MERCHANT.filter.magicalNo"))}</option>
+              </select>
+            </div>
+            <div class="pf2e-cd-mer-picker-filters-row">
+              <input type="text" name="picker-traits" class="pf2e-cd-mer-grow" placeholder="${escapeHTML(t("PF2E_CINEMATIC_MERCHANT.filter.traitsPlaceholder"))}" />
+              <input type="number" name="picker-price-max" min="0" step="0.1" placeholder="${escapeHTML(t("PF2E_CINEMATIC_MERCHANT.filter.priceMaxGp"))}" />
+              <label class="pf2e-cd-mer-picker-qty-default" title="${escapeHTML(t("PF2E_CINEMATIC_MERCHANT.picker.qtyDefaultHint"))}">
+                <span>${escapeHTML(t("PF2E_CINEMATIC_MERCHANT.picker.qtyDefault"))}</span>
+                <input type="number" name="picker-qty-default-min" min="1" max="999" value="1" />
+                <span>–</span>
+                <input type="number" name="picker-qty-default-max" min="1" max="999" value="1" />
+                <button type="button" data-action="picker-qty-apply-all" title="${escapeHTML(t("PF2E_CINEMATIC_MERCHANT.picker.qtyApplyAll"))}">
+                  <i class="fa-solid fa-arrows-up-to-line"></i>
+                </button>
+              </label>
+            </div>
           </div>
         </div>
         <div class="pf2e-cd-mer-picker-actions">

@@ -111,6 +111,10 @@
   "PF2E_CINEMATIC_MERCHANT.picker.filtersToggle": "Filter",
   "PF2E_CINEMATIC_MERCHANT.picker.filtersExpand": "Alle Filter anzeigen",
   "PF2E_CINEMATIC_MERCHANT.picker.filtersCollapse": "Filter zusammenklappen",
+  "PF2E_CINEMATIC_MERCHANT.picker.qtyRangeHint": "Menge beim Import: zufällig zwischen Min und Max (inklusive)",
+  "PF2E_CINEMATIC_MERCHANT.picker.qtyDefault": "Menge",
+  "PF2E_CINEMATIC_MERCHANT.picker.qtyDefaultHint": "Standardmenge für sichtbare Items — Klick auf den Pfeil-Button überträgt die Werte auf alle gefilterten Zeilen.",
+  "PF2E_CINEMATIC_MERCHANT.picker.qtyApplyAll": "Auf alle sichtbaren Items übertragen",
   "PF2E_CINEMATIC_MERCHANT.tile.linkCancel": "Abbrechen",
   "PF2E_CINEMATIC_MERCHANT.tile.noLootActors": "Keine Loot-Actors gefunden. Erstelle zuerst einen im Actors-Verzeichnis.",
 
