@@ -154,8 +154,6 @@ export class MerchantWindow {
       frame:        root.querySelector(".pf2e-cd-mer-frame"),
       title:        root.querySelector(".pf2e-cd-mer-title"),
       subtitle:     root.querySelector(".pf2e-cd-mer-subtitle"),
-      gold:         root.querySelector(".pf2e-cd-mer-gold-value"),
-      goldLabel:    root.querySelector(".pf2e-cd-mer-gold-label"),
       closeBtn:     root.querySelector(".pf2e-cd-mer-close"),
       popoutBtn:    root.querySelector(".pf2e-cd-mer-popout"),
       search:       root.querySelector("[name=mer-search]"),
@@ -716,26 +714,9 @@ export class MerchantWindow {
   }
 
   _refreshGold() {
-    const target = this.viewer ?? this.actor;
-    if (!target) {
-      this.refs.gold.textContent = "—";
-      return;
-    }
-    const coins = readActorCoins(target);
-    const cp = priceToCopper({ value: coins });
-    console.log(`${MODULE_ID} | purse refresh`, {
-      target: target.name,
-      isViewer: !!this.viewer,
-      coins,
-      cp,
-      formatted: formatCopper(cp),
-    });
-    this.refs.goldLabel.textContent = game.i18n.localize(
-      this.viewer
-        ? "PF2E_CINEMATIC_MERCHANT.window.yourPurse"
-        : "PF2E_CINEMATIC_MERCHANT.window.merchantPurse"
-    );
-    this.refs.gold.textContent = cp > 0 ? formatCopper(cp) : "0 gp";
+    // The header purse badge was removed — the player's gold is no longer
+    // surfaced in the merchant header. Kept as a no-op so existing callers
+    // don't have to change.
   }
 
   _wireUI() {
@@ -1184,20 +1165,12 @@ export class MerchantWindow {
       });
     }).sort((a, b) => a.name.localeCompare(b.name));
 
-    const charDiscountRows = playerCharacters.map(c => {
-      const pct = Math.round(((charDiscounts[c.id] ?? 0)) * 100);
-      const portrait = c.img ?? "icons/svg/mystery-man.svg";
-      return `
-        <label class="pf2e-cd-mer-char-discount-row" data-character-id="${c.id}">
-          <img src="${escapeHTML(portrait)}" alt="" />
-          <span class="pf2e-cd-mer-char-discount-name">${escapeHTML(c.name)}</span>
-          <div class="pf2e-cd-mer-char-discount-input">
-            <input type="number" name="char-disc-${c.id}" min="-100" max="100" step="5" value="${pct}" />
-            <b>%</b>
-          </div>
-        </label>
-      `;
-    }).join("");
+    // Build dropdown options for adding characters: every player character not
+    // already in the discounts map.
+    const renderAddOptions = () => playerCharacters
+      .filter(c => !(c.id in charDiscounts))
+      .map(c => `<option value="${c.id}">${escapeHTML(c.name)}</option>`)
+      .join("");
 
     const content = `
       <form class="pf2e-cd-mer-settings-form">
@@ -1233,9 +1206,17 @@ export class MerchantWindow {
           <fieldset class="pf2e-cd-mer-char-discounts-field">
             <legend>${game.i18n.localize("PF2E_CINEMATIC_MERCHANT.settings.characterDiscounts")}</legend>
             <p class="pf2e-cd-mer-info">${game.i18n.localize("PF2E_CINEMATIC_MERCHANT.settings.characterDiscountsHint")}</p>
-            <div class="pf2e-cd-mer-char-discounts-list">
-              ${charDiscountRows}
+            <div class="pf2e-cd-mer-char-discounts-add-row">
+              <select data-role="char-disc-add">
+                <option value="">${escapeHTML(game.i18n.localize("PF2E_CINEMATIC_MERCHANT.settings.characterDiscountsPick"))}</option>
+                ${renderAddOptions()}
+              </select>
+              <button type="button" data-action="char-disc-add">
+                <i class="fa-solid fa-plus"></i>
+                <span>${escapeHTML(game.i18n.localize("PF2E_CINEMATIC_MERCHANT.settings.characterDiscountsAdd"))}</span>
+              </button>
             </div>
+            <ul class="pf2e-cd-mer-char-discounts-list" data-role="char-disc-list"></ul>
           </fieldset>
         ` : ""}
       </form>
@@ -1251,6 +1232,7 @@ export class MerchantWindow {
         const root = dialog?.element instanceof HTMLElement ? dialog.element : dialog?.element?.[0];
         if (!root) return;
         this._wireGreetingSoundList(root, greetingSounds);
+        this._wireCharacterDiscounts(root, { playerCharacters, charDiscounts });
       },
       ok: {
         label: game.i18n.localize("PF2E_CINEMATIC_MERCHANT.settings.save"),
@@ -1263,12 +1245,15 @@ export class MerchantWindow {
           for (const r of ["common","uncommon","rare","unique"]) {
             newDiscounts[r] = Number(root?.querySelector(`[name=r-${r}]`)?.value ?? 0);
           }
-          // Collect per-character discounts (UI in percent → store as fraction).
+          // Collect per-character discounts from the dynamic list (UI in
+          // percent → store as fraction).
           const newCharDiscounts = {};
-          for (const c of playerCharacters) {
-            const raw = Number(root?.querySelector(`[name=char-disc-${c.id}]`)?.value);
-            if (Number.isFinite(raw) && Math.abs(raw) > 0) {
-              newCharDiscounts[c.id] = Math.max(-1, Math.min(1, raw / 100));
+          for (const row of root?.querySelectorAll(".pf2e-cd-mer-char-discount-row") ?? []) {
+            const cid = row.dataset.characterId;
+            if (!cid) continue;
+            const raw = Number(row.querySelector("input[type=number]")?.value);
+            if (Number.isFinite(raw)) {
+              newCharDiscounts[cid] = Math.max(-1, Math.min(1, raw / 100));
             }
           }
           await setMerchantMarkup(this.actor, markupV);
@@ -1282,6 +1267,90 @@ export class MerchantWindow {
         },
       },
     });
+  }
+
+  _wireCharacterDiscounts(root, { playerCharacters, charDiscounts }) {
+    const addSel = root.querySelector("[data-role=char-disc-add]");
+    const addBtn = root.querySelector("[data-action=char-disc-add]");
+    const list = root.querySelector("[data-role=char-disc-list]");
+    if (!list) return;
+    // Local working state — mirror what's currently selected. Mutated by
+    // add/remove; the Save callback reads from the rendered rows.
+    const active = { ...charDiscounts };
+
+    const refreshAddOptions = () => {
+      if (!addSel) return;
+      const used = new Set(Object.keys(active));
+      const opts = [`<option value="">${escapeHTML(game.i18n.localize("PF2E_CINEMATIC_MERCHANT.settings.characterDiscountsPick"))}</option>`];
+      for (const c of playerCharacters) {
+        if (used.has(c.id)) continue;
+        opts.push(`<option value="${c.id}">${escapeHTML(c.name)}</option>`);
+      }
+      addSel.innerHTML = opts.join("");
+    };
+
+    const renderList = () => {
+      const ids = Object.keys(active);
+      if (ids.length === 0) {
+        list.innerHTML = `<li class="pf2e-cd-mer-char-discounts-empty">${escapeHTML(game.i18n.localize("PF2E_CINEMATIC_MERCHANT.settings.characterDiscountsEmpty"))}</li>`;
+        refreshAddOptions();
+        return;
+      }
+      const byId = new Map(playerCharacters.map(c => [c.id, c]));
+      list.innerHTML = ids.map(id => {
+        const c = byId.get(id);
+        if (!c) return "";
+        const pct = Math.round(Number(active[id] ?? 0) * 100);
+        const portrait = c.img ?? "icons/svg/mystery-man.svg";
+        return `
+          <li class="pf2e-cd-mer-char-discount-row" data-character-id="${c.id}">
+            <img class="pf2e-cd-mer-char-discount-portrait" src="${escapeHTML(portrait)}" alt="" />
+            <span class="pf2e-cd-mer-char-discount-name">${escapeHTML(c.name)}</span>
+            <div class="pf2e-cd-mer-char-discount-input">
+              <input type="number" min="-100" max="100" step="5" value="${pct}" />
+              <b>%</b>
+            </div>
+            <button type="button" class="pf2e-cd-mer-char-discount-remove" data-action="char-disc-remove" title="${escapeHTML(game.i18n.localize("PF2E_CINEMATIC_MERCHANT.settings.characterDiscountsRemove"))}">
+              <i class="fa-solid fa-xmark"></i>
+            </button>
+          </li>
+        `;
+      }).join("");
+      // Wire per-row events
+      for (const row of list.querySelectorAll(".pf2e-cd-mer-char-discount-row")) {
+        const cid = row.dataset.characterId;
+        const inp = row.querySelector("input[type=number]");
+        inp?.addEventListener("input", () => {
+          const raw = Number(inp.value);
+          if (Number.isFinite(raw)) active[cid] = Math.max(-1, Math.min(1, raw / 100));
+        });
+        row.querySelector("[data-action=char-disc-remove]")?.addEventListener("click", () => {
+          delete active[cid];
+          renderList();
+        });
+      }
+      refreshAddOptions();
+    };
+
+    addBtn?.addEventListener("click", () => {
+      const cid = addSel?.value;
+      if (!cid) return;
+      if (cid in active) return;
+      active[cid] = 0.1; // default 10% discount; user can tweak
+      addSel.value = "";
+      renderList();
+    });
+    // Selecting from the dropdown adds immediately (no extra click required)
+    addSel?.addEventListener("change", () => {
+      const cid = addSel.value;
+      if (!cid) return;
+      if (cid in active) { addSel.value = ""; return; }
+      active[cid] = 0.1;
+      addSel.value = "";
+      renderList();
+    });
+
+    renderList();
   }
 
   _wireGreetingSoundList(root, sounds) {
@@ -2850,10 +2919,6 @@ export class MerchantWindow {
         <div class="pf2e-cd-mer-header">
           <div class="pf2e-cd-mer-subtitle"></div>
           <div class="pf2e-cd-mer-title"></div>
-          <div class="pf2e-cd-mer-gold-block">
-            <span class="pf2e-cd-mer-gold-label"></span>
-            <span class="pf2e-cd-mer-gold-value">—</span>
-          </div>
         </div>
         <div class="pf2e-cd-mer-body">
           <div class="pf2e-cd-mer-portrait-col">

@@ -124,6 +124,7 @@ export function registerGMHandlers() {
     const merchantUpdates = [];
     const merchantDeletes = [];
     const summary = [];
+    const logEntries = [];
 
     for (const line of lines) {
       const item = merchant.items.get(line.itemId);
@@ -134,6 +135,9 @@ export function registerGMHandlers() {
       const lineCp = unitCp * buyQty;
       totalCp += lineCp;
       summary.push({ name: item.name, qty: buyQty, cp: lineCp });
+      // Capture data needed for the history entry BEFORE the item is mutated
+      // or deleted below.
+      logEntries.push({ name: item.name, img: item.img, qty: buyQty, cp: lineCp });
 
       const data = item.toObject();
       delete data._id;
@@ -153,6 +157,18 @@ export function registerGMHandlers() {
     if (itemsToCreate.length) await viewer.createEmbeddedDocuments("Item", itemsToCreate);
     if (merchantUpdates.length) await merchant.updateEmbeddedDocuments("Item", merchantUpdates);
     if (merchantDeletes.length) await merchant.deleteEmbeddedDocuments("Item", merchantDeletes);
+
+    // One history entry per line so the GM sees the individual items, not
+    // just an opaque "checkout" event. Sequential to avoid racing concurrent
+    // actor.update calls on the same flag.
+    for (const e of logEntries) {
+      await recordMerchantTransaction(merchant, {
+        kind: "buy",
+        characterId: viewer.id, characterName: viewer.name,
+        itemName: e.name, itemImg: e.img,
+        qty: e.qty, cp: e.cp,
+      });
+    }
 
     return { ok: true, totalCp, lines: summary };
   });

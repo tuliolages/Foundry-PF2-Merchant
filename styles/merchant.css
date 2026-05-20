@@ -447,23 +447,29 @@
   height: 1px;
   background: linear-gradient(90deg, transparent, var(--pf2e-mer-gold-light), transparent);
 }
+/* "MERCHANT" eyebrow — now far more present: larger, brighter, double-
+   underlined for emphasis since the gold purse badge below it is gone. */
 .pf2e-cd-mer-subtitle {
   font-family: "Eczar", "Cinzel", Georgia, serif;
-  font-size: 10px;
-  letter-spacing: 5px;
+  font-size: 13px;
+  letter-spacing: 8px;
   text-transform: uppercase;
-  color: rgba(255, 220, 130, 0.85);
-  font-weight: 600;
-  margin-bottom: 2px;
+  color: var(--pf2e-mer-gold-light, #d4a948);
+  font-weight: 700;
+  margin-bottom: 4px;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.6);
+  display: inline-block;
+  padding-bottom: 2px;
+  border-bottom: 1px solid rgba(212, 169, 72, 0.45);
 }
 .pf2e-cd-mer-title {
   font-family: "Eczar", "Cinzel", Georgia, serif;
-  font-size: 26px;
+  font-size: 28px;
   font-weight: 700;
   color: var(--pf2e-mer-cream-warm);
-  letter-spacing: 1px;
-  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.7);
-  margin-bottom: 8px;
+  letter-spacing: 1.5px;
+  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.7);
+  margin-bottom: 0;
 }
 .pf2e-cd-mer-gold-block {
   display: inline-flex;
@@ -3841,6 +3847,122 @@ dialog.pf2e-cd-mer-dialog select:focus {
 .pf2e-cd-mer-service-preset-btn i {
   font-size: 16px;
   color: var(--pf2e-mer-gold-light, #d4a948);
+}
+
+/* === Character discounts (in settings dialog) === */
+.pf2e-cd-mer-char-discounts-add-row {
+  display: flex;
+  gap: 6px;
+  margin: 6px 0 10px;
+  align-items: stretch;
+}
+.pf2e-cd-mer-char-discounts-add-row select {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+.pf2e-cd-mer-char-discounts-add-row button {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 4px 12px;
+  font-family: "Eczar", Georgia, serif;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.5px;
+  text-transform: uppercase;
+  background: linear-gradient(180deg, #5a4818 0%, var(--pf2e-mer-gold) 100%);
+  border: 1px solid var(--pf2e-mer-gold-light);
+  border-radius: 3px;
+  color: var(--pf2e-mer-cream-warm);
+  cursor: pointer;
+  white-space: nowrap;
+}
+.pf2e-cd-mer-char-discounts-add-row button:hover {
+  background: linear-gradient(180deg, #7a6428 0%, #9c7a32 100%);
+}
+.pf2e-cd-mer-char-discounts-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.pf2e-cd-mer-char-discounts-empty {
+  padding: 10px 12px;
+  font-family: "Eczar", Georgia, serif;
+  font-size: 11px;
+  font-style: italic;
+  color: rgba(50, 25, 10, 0.6);
+  text-align: center;
+  background: rgba(120, 90, 40, 0.06);
+  border: 1px dashed rgba(120, 90, 40, 0.35);
+  border-radius: 3px;
+}
+.pf2e-cd-mer-char-discount-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 6px 10px;
+  background: rgba(255, 247, 230, 0.55);
+  border: 1px solid rgba(120, 90, 40, 0.4);
+  border-radius: 3px;
+}
+.pf2e-cd-mer-char-discount-portrait {
+  width: 32px !important;
+  height: 32px !important;
+  flex: 0 0 32px !important;
+  object-fit: cover;
+  border-radius: 50%;
+  border: 1px solid var(--pf2e-mer-gold);
+  background: var(--pf2e-mer-cream);
+}
+.pf2e-cd-mer-char-discount-name {
+  flex: 1 1 auto;
+  font-family: "Eczar", Georgia, serif;
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--pf2e-mer-text);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  min-width: 0;
+}
+.pf2e-cd-mer-char-discount-input {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  flex: 0 0 auto;
+}
+.pf2e-cd-mer-char-discount-input input[type=number] {
+  width: 60px !important;
+  text-align: center;
+  padding: 4px 6px !important;
+}
+.pf2e-cd-mer-char-discount-input b {
+  font-family: "Eczar", Georgia, serif;
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--pf2e-mer-red);
+}
+.pf2e-cd-mer-char-discount-remove {
+  width: 24px;
+  height: 24px;
+  flex: 0 0 24px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: transparent;
+  border: 1px solid var(--pf2e-mer-red);
+  border-radius: 50%;
+  color: var(--pf2e-mer-red);
+  cursor: pointer;
+  font-size: 11px;
+  padding: 0;
+}
+.pf2e-cd-mer-char-discount-remove:hover {
+  background: var(--pf2e-mer-red);
+  color: var(--pf2e-mer-cream-warm);
 }
 
 /* === Transaction history dialog === */

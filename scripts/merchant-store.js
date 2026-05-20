@@ -551,6 +551,31 @@ export async function recordMerchantTransaction(merchant, entry) {
   }
 }
 
+/** Batch version — append N entries in a single actor.update so parallel
+ *  cart-checkout writes don't race and clobber each other. */
+export async function recordMerchantTransactions(merchant, entries) {
+  if (!merchant || !Array.isArray(entries) || entries.length === 0) return;
+  const log = getMerchantTransactionLog(merchant);
+  const clean = entries.map(entry => ({
+    kind: entry.kind === "sell" ? "sell" : "buy",
+    characterId: String(entry.characterId ?? ""),
+    characterName: String(entry.characterName ?? "—"),
+    userName: String(entry.userName ?? game.user?.name ?? ""),
+    itemName: String(entry.itemName ?? "—"),
+    itemImg: String(entry.itemImg ?? "icons/svg/item-bag.svg"),
+    qty: Math.max(1, Number(entry.qty) || 1),
+    cp: Math.max(0, Number(entry.cp) || 0),
+    when: Number(entry.when) || Date.now(),
+  }));
+  const next = [...log, ...clean];
+  if (next.length > MAX_TRANSACTION_LOG) next.splice(0, next.length - MAX_TRANSACTION_LOG);
+  try {
+    await merchant.update({ [`flags.${MODULE_ID}.transactionLog`]: next });
+  } catch (err) {
+    console.debug(`${MODULE_ID} | batch transaction log update skipped:`, err?.message);
+  }
+}
+
 export async function clearMerchantTransactionLog(merchant) {
   if (!merchant) return;
   return merchant.update({ [`flags.${MODULE_ID}.-=transactionLog`]: null });
