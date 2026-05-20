@@ -3892,11 +3892,23 @@ dialog.pf2e-cd-mer-dialog select:focus {
 }
 .pf2e-cd-mer-hist-toolbar {
   display: flex;
-  gap: 6px;
+  gap: 8px;
   flex: 0 0 auto;
+  align-items: stretch;
 }
-.pf2e-cd-mer-hist-toolbar input[type=search] { flex: 1 1 auto; }
-.pf2e-cd-mer-hist-toolbar select { flex: 0 0 auto; min-width: 130px; }
+.pf2e-cd-mer-hist-toolbar input[type=search] {
+  flex: 1 1 auto;
+  min-width: 0;
+  padding: 6px 10px !important;
+}
+.pf2e-cd-mer-hist-toolbar select {
+  flex: 0 0 160px;
+  min-width: 160px;
+}
+.pf2e-cd-mer-hist-toolbar button {
+  flex: 0 0 auto;
+  white-space: nowrap;
+}
 .pf2e-cd-mer-hist-clear-btn {
   display: inline-flex;
   align-items: center;

@@ -27,6 +27,9 @@ import {
   recordMerchantTransaction,
   getMerchantTransactionLog,
   clearMerchantTransactionLog,
+  getMerchantCharacterDiscounts,
+  setMerchantCharacterDiscounts,
+  effectiveSellRate,
   normalizeMerchantType,
   getMerchantServices,
   addMerchantService,
@@ -639,10 +642,12 @@ export class MerchantWindow {
   _logTransaction(kind, name, qty, cp, opts = {}) {
     const when = Date.now();
     this.transactions.push({ kind, name, qty, cp, when });
-    // Best-effort persistent log on the merchant actor. Only the GM (or
-    // anyone with update perms) will succeed; players go through the relay
-    // which records server-side.
-    if (this.actor && game.user.isGM) {
+    // Best-effort persistent log on the merchant actor. Players who reached
+    // this path have owner permission (granted by ensureMerchantOwnership),
+    // so the actor.update inside recordMerchantTransaction will succeed for
+    // them too. If permission is missing for some edge case, the GM-relay
+    // path in gm-ops.js logs server-side instead.
+    if (this.actor) {
       recordMerchantTransaction(this.actor, {
         kind,
         characterId: this.viewer?.id ?? "",
@@ -933,7 +938,7 @@ export class MerchantWindow {
       } else {
         throw new Error("no_permission_no_gm");
       }
-      for (const l of lines) this._logTransaction("buy", l.item.name, l.qty, l.lineCp);
+      for (const l of lines) this._logTransaction("buy", l.item.name, l.qty, l.lineCp, { img: l.item.img });
       playBuy();
       const itemCount = lines.reduce((n, l) => n + l.qty, 0);
       const distinct = lines.length;
@@ -1147,7 +1152,7 @@ export class MerchantWindow {
       } else {
         throw new Error("no_permission_no_gm");
       }
-      this._logTransaction("sell", item.name, sellQty, totalCp);
+      this._logTransaction("sell", item.name, sellQty, totalCp, { img: item.img });
       playSell();
       this._showTransactionPopup({
         kind: "sell", name: item.name, img: item.img, qty: sellQty, price: formatCopper(totalCp),
@@ -1167,7 +1172,33 @@ export class MerchantWindow {
     const discounts = getMerchantRarityDiscounts(this.actor);
     const sellRate = getMerchantSellRate(this.actor);
     const greetingSounds = [...getMerchantGreetingSounds(this.actor)];
-    const coins = readMerchantCoins(this.actor);
+    const charDiscounts = { ...getMerchantCharacterDiscounts(this.actor) };
+    // Collect player characters — type:"character" actors owned by any non-GM.
+    const playerCharacters = (game.actors ?? []).filter(a => {
+      if (a.type !== "character") return false;
+      const owners = Object.entries(a.ownership ?? {})
+        .filter(([uid, lvl]) => lvl >= CONST.DOCUMENT_OWNERSHIP_LEVELS.OWNER && uid !== "default");
+      return owners.some(([uid]) => {
+        const u = game.users?.get?.(uid);
+        return u && !u.isGM;
+      });
+    }).sort((a, b) => a.name.localeCompare(b.name));
+
+    const charDiscountRows = playerCharacters.map(c => {
+      const pct = Math.round(((charDiscounts[c.id] ?? 0)) * 100);
+      const portrait = c.img ?? "icons/svg/mystery-man.svg";
+      return `
+        <label class="pf2e-cd-mer-char-discount-row" data-character-id="${c.id}">
+          <img src="${escapeHTML(portrait)}" alt="" />
+          <span class="pf2e-cd-mer-char-discount-name">${escapeHTML(c.name)}</span>
+          <div class="pf2e-cd-mer-char-discount-input">
+            <input type="number" name="char-disc-${c.id}" min="-100" max="100" step="5" value="${pct}" />
+            <b>%</b>
+          </div>
+        </label>
+      `;
+    }).join("");
+
     const content = `
       <form class="pf2e-cd-mer-settings-form">
         <p class="pf2e-cd-mer-info">${game.i18n.localize("PF2E_CINEMATIC_MERCHANT.settings.info")}</p>
@@ -1179,16 +1210,6 @@ export class MerchantWindow {
             <i class="fa-solid fa-plus"></i>
             <span>${escapeHTML(game.i18n.localize("PF2E_CINEMATIC_MERCHANT.settings.greetingSoundsAdd"))}</span>
           </button>
-        </fieldset>
-        <fieldset>
-          <legend>${game.i18n.localize("PF2E_CINEMATIC_MERCHANT.settings.merchantPurse")}</legend>
-          <div class="pf2e-cd-mer-settings-coin-grid">
-            <label><span>pp</span><input type="number" name="coin-pp" min="0" step="1" value="${coins.pp}" /></label>
-            <label><span>gp</span><input type="number" name="coin-gp" min="0" step="1" value="${coins.gp}" /></label>
-            <label><span>sp</span><input type="number" name="coin-sp" min="0" step="1" value="${coins.sp}" /></label>
-            <label><span>cp</span><input type="number" name="coin-cp" min="0" step="1" value="${coins.cp}" /></label>
-          </div>
-          <p class="pf2e-cd-mer-info">${game.i18n.localize("PF2E_CINEMATIC_MERCHANT.settings.merchantPurseHint")}</p>
         </fieldset>
         <label>${game.i18n.localize("PF2E_CINEMATIC_MERCHANT.settings.markup")}
           <input type="number" name="markup" min="0" max="5" step="0.05" value="${markup}" />
@@ -1208,6 +1229,15 @@ export class MerchantWindow {
           </div>
         </fieldset>
         <p class="pf2e-cd-mer-info">${game.i18n.localize("PF2E_CINEMATIC_MERCHANT.settings.discountHint")}</p>
+        ${playerCharacters.length > 0 ? `
+          <fieldset class="pf2e-cd-mer-char-discounts-field">
+            <legend>${game.i18n.localize("PF2E_CINEMATIC_MERCHANT.settings.characterDiscounts")}</legend>
+            <p class="pf2e-cd-mer-info">${game.i18n.localize("PF2E_CINEMATIC_MERCHANT.settings.characterDiscountsHint")}</p>
+            <div class="pf2e-cd-mer-char-discounts-list">
+              ${charDiscountRows}
+            </div>
+          </fieldset>
+        ` : ""}
       </form>
     `;
     const DialogV2 = foundry.applications?.api?.DialogV2;
@@ -1233,17 +1263,19 @@ export class MerchantWindow {
           for (const r of ["common","uncommon","rare","unique"]) {
             newDiscounts[r] = Number(root?.querySelector(`[name=r-${r}]`)?.value ?? 0);
           }
-          const newCoins = {
-            pp: Number(root?.querySelector("[name=coin-pp]")?.value ?? 0),
-            gp: Number(root?.querySelector("[name=coin-gp]")?.value ?? 0),
-            sp: Number(root?.querySelector("[name=coin-sp]")?.value ?? 0),
-            cp: Number(root?.querySelector("[name=coin-cp]")?.value ?? 0),
-          };
+          // Collect per-character discounts (UI in percent → store as fraction).
+          const newCharDiscounts = {};
+          for (const c of playerCharacters) {
+            const raw = Number(root?.querySelector(`[name=char-disc-${c.id}]`)?.value);
+            if (Number.isFinite(raw) && Math.abs(raw) > 0) {
+              newCharDiscounts[c.id] = Math.max(-1, Math.min(1, raw / 100));
+            }
+          }
           await setMerchantMarkup(this.actor, markupV);
           await setMerchantSellRate(this.actor, sellV);
           await setMerchantRarityDiscounts(this.actor, newDiscounts);
           await setMerchantGreetingSounds(this.actor, greetingSounds);
-          await setMerchantCoins(this.actor, newCoins);
+          await setMerchantCharacterDiscounts(this.actor, newCharDiscounts);
           this._refreshHeader();
           this._renderItems();
           this._refreshGold();
@@ -1562,7 +1594,7 @@ export class MerchantWindow {
         await deductCoins(this.viewer, priceCp);
         await addCoins(this.actor, priceCp);
       }
-      this._logTransaction("buy", s.name, 1, priceCp);
+      this._logTransaction("buy", s.name, 1, priceCp, { img: s.img });
       playBuy();
       this._showTransactionPopup({
         kind: "buy", name: s.name, img: s.img, qty: 1, price: formatCopper(priceCp),
@@ -2579,7 +2611,7 @@ export class MerchantWindow {
       } else {
         throw new Error("no_permission_no_gm");
       }
-      this._logTransaction("buy", item.name, buyQty, totalCp);
+      this._logTransaction("buy", item.name, buyQty, totalCp, { img: item.img });
       playBuy();
       this._showTransactionPopup({
         kind: "buy", name: item.name, img: item.img, qty: buyQty, price: formatCopper(totalCp),
