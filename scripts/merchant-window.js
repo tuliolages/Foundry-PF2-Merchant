@@ -1577,59 +1577,112 @@ export class MerchantWindow {
         return `<optgroup label="${escapeHTML(sc)}">${opts}</optgroup>`;
       }).join("");
 
-    const presetSelect = existing ? "" : `
-      <label>${game.i18n.localize("PF2E_CINEMATIC_MERCHANT.service.field.preset")}
-        <select name="svc-preset" multiple size="10">
+    const presetSection = existing ? "" : `
+      <details class="pf2e-cd-mer-service-presets" data-role="svc-presets">
+        <summary>
+          <i class="fa-solid fa-list-check"></i>
+          <span>${escapeHTML(game.i18n.localize("PF2E_CINEMATIC_MERCHANT.service.field.preset"))}</span>
+          <small class="pf2e-cd-mer-service-preset-hint" data-state="custom">${escapeHTML(game.i18n.localize("PF2E_CINEMATIC_MERCHANT.service.preset.hintCustom"))}</small>
+        </summary>
+        <input type="search" class="pf2e-cd-mer-service-preset-search" data-role="svc-preset-search" placeholder="${escapeHTML(game.i18n.localize("PF2E_CINEMATIC_MERCHANT.filter.search"))}" />
+        <select name="svc-preset" multiple size="8">
           ${presetOptions}
         </select>
-        <small class="pf2e-cd-mer-service-preset-hint" data-state="custom">${escapeHTML(game.i18n.localize("PF2E_CINEMATIC_MERCHANT.service.preset.hintCustom"))}</small>
-      </label>
+      </details>
     `;
 
+    const initialImg = existing?.img ?? "icons/svg/book.svg";
     await DialogV2.prompt({
       window: { title: game.i18n.localize(titleKey) },
-      position: { width: existing ? 480 : 620 },
+      position: { width: 520 },
       content: `
         <form class="pf2e-cd-mer-service-form">
-          ${presetSelect}
-          <label>${game.i18n.localize("PF2E_CINEMATIC_MERCHANT.service.field.name")}
-            <input type="text" name="svc-name" value="${escapeHTML(existing?.name ?? "")}" autofocus />
-          </label>
-          <label>${game.i18n.localize("PF2E_CINEMATIC_MERCHANT.service.field.description")}
-            <textarea name="svc-desc" rows="3" placeholder="${escapeHTML(game.i18n.localize("PF2E_CINEMATIC_MERCHANT.service.field.descriptionPlaceholder"))}">${escapeHTML(existing?.description ?? "")}</textarea>
-          </label>
-          <div class="pf2e-cd-mer-service-form-row">
-            <label>${game.i18n.localize("PF2E_CINEMATIC_MERCHANT.detail.level")}
+          ${presetSection}
+          <div class="pf2e-cd-mer-service-form-grid">
+            <label class="pf2e-cd-mer-svc-field pf2e-cd-mer-svc-icon-field">
+              <span>${game.i18n.localize("PF2E_CINEMATIC_MERCHANT.service.field.img")}</span>
+              <div class="pf2e-cd-mer-svc-icon-row">
+                <img class="pf2e-cd-mer-svc-icon-preview" data-role="svc-img-preview" src="${escapeHTML(initialImg)}" alt="" />
+                <input type="text" name="svc-img" value="${escapeHTML(initialImg)}" />
+                <button type="button" class="pf2e-cd-mer-svc-icon-browse" data-action="svc-img-browse" title="${escapeHTML(game.i18n.localize("PF2E_CINEMATIC_MERCHANT.service.field.imgBrowse"))}">
+                  <i class="fa-solid fa-folder-open"></i>
+                </button>
+              </div>
+            </label>
+            <label class="pf2e-cd-mer-svc-field pf2e-cd-mer-svc-name-field">
+              <span>${game.i18n.localize("PF2E_CINEMATIC_MERCHANT.service.field.name")}</span>
+              <input type="text" name="svc-name" value="${escapeHTML(existing?.name ?? "")}" autofocus />
+            </label>
+            <label class="pf2e-cd-mer-svc-field pf2e-cd-mer-svc-level-field">
+              <span>${game.i18n.localize("PF2E_CINEMATIC_MERCHANT.detail.level")}</span>
               <input type="number" name="svc-level" min="0" max="25" value="${existing?.level ?? 0}" />
             </label>
-            <label>${game.i18n.localize("PF2E_CINEMATIC_MERCHANT.compare.rarity")}
+            <label class="pf2e-cd-mer-svc-field pf2e-cd-mer-svc-rarity-field">
+              <span>${game.i18n.localize("PF2E_CINEMATIC_MERCHANT.compare.rarity")}</span>
               <select name="svc-rarity">
                 ${["common","uncommon","rare","unique"].map(r => `<option value="${r}"${(existing?.rarity ?? "common") === r ? " selected" : ""}>${escapeHTML(localizeRarity(r))}</option>`).join("")}
               </select>
             </label>
-          </div>
-          <fieldset>
-            <legend>${game.i18n.localize("PF2E_CINEMATIC_MERCHANT.service.field.price")}</legend>
-            <div class="pf2e-cd-mer-service-coin-grid">
-              <label><span>pp</span><input type="number" name="svc-pp" min="0" value="${coins.pp}" /></label>
-              <label><span>gp</span><input type="number" name="svc-gp" min="0" value="${coins.gp}" /></label>
-              <label><span>sp</span><input type="number" name="svc-sp" min="0" value="${coins.sp}" /></label>
-              <label><span>cp</span><input type="number" name="svc-cp" min="0" value="${coins.cp}" /></label>
+            <label class="pf2e-cd-mer-svc-field pf2e-cd-mer-svc-desc-field">
+              <span>${game.i18n.localize("PF2E_CINEMATIC_MERCHANT.service.field.description")}</span>
+              <textarea name="svc-desc" rows="3" placeholder="${escapeHTML(game.i18n.localize("PF2E_CINEMATIC_MERCHANT.service.field.descriptionPlaceholder"))}">${escapeHTML(existing?.description ?? "")}</textarea>
+            </label>
+            <div class="pf2e-cd-mer-svc-field pf2e-cd-mer-svc-price-field">
+              <span>${game.i18n.localize("PF2E_CINEMATIC_MERCHANT.service.field.price")}</span>
+              <div class="pf2e-cd-mer-service-coin-inline">
+                <label><input type="number" name="svc-pp" min="0" value="${coins.pp}" /><b>pp</b></label>
+                <label><input type="number" name="svc-gp" min="0" value="${coins.gp}" /><b>gp</b></label>
+                <label><input type="number" name="svc-sp" min="0" value="${coins.sp}" /><b>sp</b></label>
+                <label><input type="number" name="svc-cp" min="0" value="${coins.cp}" /><b>cp</b></label>
+              </div>
             </div>
-          </fieldset>
-          <label>${game.i18n.localize("PF2E_CINEMATIC_MERCHANT.service.field.img")}
-            <input type="text" name="svc-img" value="${escapeHTML(existing?.img ?? "icons/svg/book.svg")}" />
-          </label>
+          </div>
         </form>
       `,
       classes: ["pf2e-cd-mer-dialog", "pf2e-cd-mer-service-dialog"],
       render: (event, dialog) => {
         const root = dialog?.element instanceof HTMLElement ? dialog.element : dialog?.element?.[0];
+        if (!root) return;
+        // Icon picker + preview sync
+        const imgInput = root.querySelector("[name=svc-img]");
+        const imgPreview = root.querySelector("[data-role=svc-img-preview]");
+        const imgBrowse = root.querySelector("[data-action=svc-img-browse]");
+        const syncImg = () => {
+          if (imgPreview && imgInput) imgPreview.src = imgInput.value || "icons/svg/book.svg";
+        };
+        imgInput?.addEventListener("input", syncImg);
+        imgBrowse?.addEventListener("click", () => {
+          const FP = foundry.applications?.apps?.FilePicker?.implementation ?? globalThis.FilePicker;
+          if (!FP || !imgInput) return;
+          new FP({
+            type: "image",
+            current: imgInput.value,
+            callback: (path) => {
+              if (typeof path === "string" && path.length > 0) {
+                imgInput.value = path;
+                syncImg();
+              }
+            },
+          }).render(true);
+        });
+        // Preset-list search filter
+        const searchInput = root.querySelector("[data-role=svc-preset-search]");
         const sel = root?.querySelector("[name=svc-preset]");
+        searchInput?.addEventListener("input", () => {
+          if (!sel) return;
+          const q = searchInput.value.trim().toLowerCase();
+          for (const opt of sel.querySelectorAll("option")) {
+            opt.hidden = !!q && !opt.textContent.toLowerCase().includes(q);
+          }
+          for (const grp of sel.querySelectorAll("optgroup")) {
+            const anyVisible = [...grp.querySelectorAll("option")].some(o => !o.hidden);
+            grp.hidden = !anyVisible;
+          }
+        });
         if (!sel) return;
         const hint = root.querySelector(".pf2e-cd-mer-service-preset-hint");
         const set = (n, v) => { const el = root.querySelector(`[name=${n}]`); if (el) el.value = String(v); };
-        const customFields = root.querySelectorAll(".pf2e-cd-mer-service-form > label:not(:first-child), .pf2e-cd-mer-service-form > .pf2e-cd-mer-service-form-row, .pf2e-cd-mer-service-form > fieldset");
+        const customFields = root.querySelectorAll(".pf2e-cd-mer-service-form-grid");
         const updateHint = () => {
           const selected = Array.from(sel.selectedOptions).map(o => Number(o.value)).filter(n => Number.isFinite(n) && n >= 0);
           if (!hint) return selected;
@@ -1660,6 +1713,7 @@ export class MerchantWindow {
           set("svc-gp", coins.gp);
           set("svc-sp", coins.sp);
           set("svc-cp", coins.cp);
+          syncImg();
         });
         updateHint();
       },

@@ -3787,17 +3787,162 @@ dialog.pf2e-cd-mer-dialog select:focus {
   -webkit-text-fill-color: #f4ecd8 !important;
   font-weight: 700 !important;
 }
-.pf2e-cd-mer-service-preset-hint {
-  display: block;
-  margin-top: 4px;
-  padding: 4px 8px;
-  border-radius: 2px;
+/* === Cleaner add-service dialog layout === */
+.pf2e-cd-mer-service-presets {
+  border: 1px solid var(--pf2e-mer-gold);
+  border-radius: 3px;
+  background: rgba(120, 90, 40, 0.06);
+  padding: 0;
+  margin: 0;
+}
+.pf2e-cd-mer-service-presets > summary {
+  cursor: pointer;
+  list-style: none;
+  padding: 8px 12px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-family: "Eczar", Georgia, serif;
   font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 1.5px;
+  text-transform: uppercase;
+  color: var(--pf2e-mer-red);
+  user-select: none;
+  border-radius: 3px;
+}
+.pf2e-cd-mer-service-presets > summary::-webkit-details-marker { display: none; }
+.pf2e-cd-mer-service-presets > summary::before {
+  content: "▸";
+  display: inline-block;
+  width: 12px;
+  font-size: 12px;
+  transition: transform 160ms ease;
+}
+.pf2e-cd-mer-service-presets[open] > summary::before { transform: rotate(90deg); }
+.pf2e-cd-mer-service-presets > summary > i { color: var(--pf2e-mer-gold); }
+.pf2e-cd-mer-service-presets > summary > span { flex: 1; }
+.pf2e-cd-mer-service-presets > .pf2e-cd-mer-service-preset-search {
+  margin: 0 12px 6px;
+  width: calc(100% - 24px);
+}
+.pf2e-cd-mer-service-presets > select[multiple] {
+  margin: 0 12px 12px;
+  width: calc(100% - 24px);
+  min-height: 180px !important; /* override the global 220px */
+  max-height: 220px;
+}
+
+.pf2e-cd-mer-service-form-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+  align-items: start;
+}
+.pf2e-cd-mer-svc-field {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.pf2e-cd-mer-svc-field > span {
+  font-family: "Eczar", Georgia, serif;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 1.5px;
+  text-transform: uppercase;
+  color: var(--pf2e-mer-red);
+}
+.pf2e-cd-mer-svc-icon-field,
+.pf2e-cd-mer-svc-name-field,
+.pf2e-cd-mer-svc-desc-field,
+.pf2e-cd-mer-svc-price-field {
+  grid-column: 1 / -1;
+}
+.pf2e-cd-mer-svc-level-field,
+.pf2e-cd-mer-svc-rarity-field {
+  grid-column: span 1;
+}
+.pf2e-cd-mer-svc-icon-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.pf2e-cd-mer-svc-icon-preview {
+  width: 36px;
+  height: 36px;
+  object-fit: contain;
+  border: 1px solid var(--pf2e-mer-gold);
+  border-radius: 3px;
+  background: var(--pf2e-mer-cream);
+  padding: 2px;
+  flex: 0 0 36px;
+}
+.pf2e-cd-mer-svc-icon-row > input[type=text] {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+.pf2e-cd-mer-svc-icon-browse {
+  flex: 0 0 36px;
+  width: 36px;
+  height: 36px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: linear-gradient(180deg, #5a4818 0%, var(--pf2e-mer-gold) 100%);
+  border: 1px solid var(--pf2e-mer-gold-light);
+  border-radius: 3px;
+  color: var(--pf2e-mer-cream-warm);
+  cursor: pointer;
+  transition: background 140ms ease;
+  padding: 0;
+}
+.pf2e-cd-mer-svc-icon-browse:hover {
+  background: linear-gradient(180deg, #7a6428 0%, #9c7a32 100%);
+}
+.pf2e-cd-mer-service-coin-inline {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 8px;
+}
+.pf2e-cd-mer-service-coin-inline label {
+  display: flex !important;
+  flex-direction: row !important;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 6px;
+  background: rgba(255, 247, 230, 0.5);
+  border: 1px solid rgba(120, 90, 40, 0.3);
+  border-radius: 3px;
+}
+.pf2e-cd-mer-service-coin-inline label > input[type=number] {
+  flex: 1 1 auto;
+  min-width: 0 !important;
+  width: 100% !important;
+  text-align: center;
+  padding: 4px 6px !important;
+}
+.pf2e-cd-mer-service-coin-inline label > b {
+  font-family: "Eczar", Georgia, serif;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+  color: var(--pf2e-mer-red);
+  flex: 0 0 auto;
+}
+
+.pf2e-cd-mer-service-preset-hint {
+  display: inline-block;
+  margin: 0 0 0 auto;
+  padding: 2px 8px;
+  border-radius: 2px;
+  font-size: 10px;
   font-weight: 600;
   letter-spacing: 0.5px;
   font-family: "Eczar", Georgia, serif;
   background: rgba(120, 90, 40, 0.08);
   color: var(--pf2e-mer-text, #1a0e05);
+  text-transform: none;
 }
 .pf2e-cd-mer-service-preset-hint[data-state="bulk"] {
   background: rgba(94, 0, 0, 0.14);
