@@ -6,6 +6,29 @@ A click-a-tile merchant-shop module for the **Pathfinder 2e** system in Foundry 
 ![PF2E system](https://img.shields.io/badge/system-PF2E-orange)
 ![License: MIT](https://img.shields.io/badge/license-MIT-green)
 
+![Merchant categories view](docs/screenshots/01-categories.png)
+
+---
+
+## Screenshots
+
+<p align="center">
+  <img src="docs/screenshots/02-items.png" width="48%" alt="Item list with daily offers + filters" />
+  <img src="docs/screenshots/03-import.png" width="48%" alt="Compendium import dialog with filters and per-item qty ranges" />
+</p>
+<p align="center">
+  <img src="docs/screenshots/04-random-stock.png" width="48%" alt="Random stock generator with category chips and rarity weights" />
+  <img src="docs/screenshots/07-history.png" width="48%" alt="GM transaction history" />
+</p>
+<p align="center">
+  <img src="docs/screenshots/05-vault.png" width="48%" alt="Per-character vault" />
+  <img src="docs/screenshots/06-sell.png" width="48%" alt="Sell to merchant dialog" />
+</p>
+<p align="center">
+  <img src="docs/screenshots/08-compare.png" width="48%" alt="Item comparison modal" />
+  <img src="docs/screenshots/09-cart.png" width="48%" alt="Shopping cart" />
+</p>
+
 ---
 
 ## Features

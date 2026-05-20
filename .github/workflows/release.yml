@@ -36,10 +36,12 @@ jobs:
             LICENSE \
             README.md \
             CHANGELOG.md \
+            SECURITY.md \
             scripts \
             styles \
             sounds \
             lang \
+            docs \
             -x "*.DS_Store" \
             -x "node_modules/*"
 
