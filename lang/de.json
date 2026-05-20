@@ -137,6 +137,7 @@
   "PF2E_CINEMATIC_MERCHANT.tile.clickAreaLegend": "Klick-Bereich",
   "PF2E_CINEMATIC_MERCHANT.tile.clickAreaHint": "Ziehe das Rechteck so, dass es nur den klickbaren Bereich des Händlers umfasst (z.B. nur den Charakter, nicht den Hintergrund). Ziehe einen leeren Bereich, um neu zu beginnen.",
   "PF2E_CINEMATIC_MERCHANT.tile.clickAreaReset": "Auf gesamtes Bild zurücksetzen",
+  "PF2E_CINEMATIC_MERCHANT.tile.clickAreaMirrorNote": "Dieses Tile ist gespiegelt. Das Bild unten ist genauso gespiegelt dargestellt — zeichne das Rechteck dort, wo der Charakter im Spiel erscheint.",
   "PF2E_CINEMATIC_MERCHANT.tile.useImageAlpha": "Bild-Alpha als Hit-Maske verwenden",
   "PF2E_CINEMATIC_MERCHANT.tile.useImageAlphaHint": "Wie bei „Monk's Active Tile Triggers\": Klicks auf transparente Pixel werden ignoriert. Funktioniert NUR mit Alpha-Kanal-Bildern (PNG, WEBP) — JPGs sind immer komplett opak, da bringt diese Option nichts. Für JPG-Bilder nutze das Rechteck oben.",
   "PF2E_CINEMATIC_MERCHANT.picker.filtersToggle": "Filter",

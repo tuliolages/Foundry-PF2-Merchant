@@ -137,6 +137,7 @@
   "PF2E_CINEMATIC_MERCHANT.tile.clickAreaLegend": "Click area",
   "PF2E_CINEMATIC_MERCHANT.tile.clickAreaHint": "Drag the rectangle so it covers only the clickable part of the merchant (e.g. just the character, not the background). Drag on an empty area to start a fresh rectangle.",
   "PF2E_CINEMATIC_MERCHANT.tile.clickAreaReset": "Reset to full image",
+  "PF2E_CINEMATIC_MERCHANT.tile.clickAreaMirrorNote": "This tile is mirrored. The image below is mirrored the same way — draw the rectangle where the character actually appears in the scene.",
   "PF2E_CINEMATIC_MERCHANT.tile.useImageAlpha": "Use image alpha as hit mask",
   "PF2E_CINEMATIC_MERCHANT.tile.useImageAlphaHint": "Like Monk's Active Tile Triggers: clicks on transparent pixels are ignored. ONLY works with alpha-channel images (PNG, WEBP) — JPGs are always fully opaque, so this option does nothing for them. For JPG images use the rectangle above instead.",
   "PF2E_CINEMATIC_MERCHANT.picker.filtersToggle": "Filters",

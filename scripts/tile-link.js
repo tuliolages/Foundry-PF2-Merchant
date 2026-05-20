@@ -77,14 +77,40 @@ function getAlphaSampler(src) {
   return entry;
 }
 
-/** Convert a scene-space point into a UV coordinate on the tile's texture. */
+/**
+ * Convert a scene-space point into a UV coordinate inside the tile RECT
+ * (0..1 across the tile rectangle, not the texture). This is mirror-agnostic
+ * because the tile rectangle in scene space is not flipped by texture mirror —
+ * only the IMAGE drawn inside it is. Click area is stored in these same
+ * tile-rect coords so a rect drawn over the displayed character at scene
+ * position X always matches a click at scene position X.
+ *
+ * Prefer tile.bounds when available — Foundry recomputes that to be the
+ * actual rendered rect, so the math survives whatever V13/V14 ends up doing
+ * with TileDocument's x/y/width/height anchoring.
+ */
 function sceneToTileUV(tile, scenePoint) {
   const doc = tile.document;
-  const cx = doc.x + doc.width / 2;
-  const cy = doc.y + doc.height / 2;
+  const bounds = tile.bounds;
+  const rot = Number(doc.rotation) || 0;
+  // Pick the rect to normalize against. For non-rotated tiles, bounds == doc
+  // == the displayed rect — perfect. For rotated tiles, bounds is the AABB
+  // (larger than the rotated rect), so we apply inverse rotation against the
+  // doc rect instead.
+  let cx, cy, w, h;
+  if (rot === 0 && bounds && Number.isFinite(bounds.x) && Number.isFinite(bounds.width)) {
+    cx = bounds.x + bounds.width / 2;
+    cy = bounds.y + bounds.height / 2;
+    w = bounds.width;
+    h = bounds.height;
+  } else {
+    cx = doc.x + doc.width / 2;
+    cy = doc.y + doc.height / 2;
+    w = doc.width;
+    h = doc.height;
+  }
   let rx = scenePoint.x - cx;
   let ry = scenePoint.y - cy;
-  const rot = Number(doc.rotation) || 0;
   if (rot !== 0) {
     const rad = -rot * Math.PI / 180;
     const cos = Math.cos(rad), sin = Math.sin(rad);
@@ -92,14 +118,21 @@ function sceneToTileUV(tile, scenePoint) {
     const y2 = rx * sin + ry * cos;
     rx = x2; ry = y2;
   }
-  let u = rx / doc.width + 0.5;
-  let v = ry / doc.height + 0.5;
-  // Honour texture mirroring (negative scaleX/scaleY).
+  const u = rx / w + 0.5;
+  const v = ry / h + 0.5;
+  return { u, v };
+}
+
+/** UV in the original IMAGE (after un-mirroring the displayed-tile UV).
+ *  Used by the alpha sampler which reads from the unmirrored source image. */
+function tileUVToImageUV(tile, u, v) {
+  const doc = tile.document;
   const sx = Number(doc.texture?.scaleX ?? 1);
   const sy = Number(doc.texture?.scaleY ?? 1);
-  if (sx < 0) u = 1 - u;
-  if (sy < 0) v = 1 - v;
-  return { u, v };
+  return {
+    u: sx < 0 ? 1 - u : u,
+    v: sy < 0 ? 1 - v : v,
+  };
 }
 
 /** Check if scenePoint is inside the tile's GM-defined click rectangle. */
@@ -135,14 +168,17 @@ function isOpaqueAtScenePoint(tile, scenePoint) {
     if (!src) return true;
     const sampler = getAlphaSampler(src);
     if (!sampler?.sample) return true; // not ready yet → permit
-    const uv = sceneToTileUV(tile, scenePoint);
-    if (!uv) return true;
+    const tileUv = sceneToTileUV(tile, scenePoint);
+    if (!tileUv) return true;
+    // Sample the original (un-mirrored) image, so mirrored tiles still
+    // hit-test against the right pixel of the source texture.
+    const uv = tileUVToImageUV(tile, tileUv.u, tileUv.v);
     if (!Number.isFinite(uv.u) || !Number.isFinite(uv.v)) return true;
     if (uv.u < 0 || uv.u > 1 || uv.v < 0 || uv.v > 1) return true;
     const alpha = sampler.sample(uv.u, uv.v);
     const opaque = alpha >= ALPHA_THRESHOLD;
     if (!opaque) {
-      console.log(`${MODULE_ID} | alpha hit-test rejected click on ${tile.id}`, { u: uv.u.toFixed(3), v: uv.v.toFixed(3), alpha });
+      console.log(`${MODULE_ID} | alpha hit-test rejected click on ${tile.id}`, { tileU: tileUv.u.toFixed(3), tileV: tileUv.v.toFixed(3), imgU: uv.u.toFixed(3), imgV: uv.v.toFixed(3), alpha });
     }
     return opaque;
   } catch (err) {
@@ -396,6 +432,14 @@ async function openLinkPicker(tileDoc) {
   const currentArea = getTileClickArea(tileDoc) ?? { x: 0, y: 0, w: 1, h: 1 };
   const currentUseAlpha = getTileUseImageAlpha(tileDoc);
   const tileImgSrc = tileDoc?.texture?.src ?? "";
+  // If the tile is mirrored (negative texture.scaleX / scaleY), reflect that
+  // in the editor preview so the GM draws the rectangle on the same orientation
+  // they actually see in the scene.
+  const tileSx = Number(tileDoc?.texture?.scaleX ?? 1);
+  const tileSy = Number(tileDoc?.texture?.scaleY ?? 1);
+  const tileMirrorTransform = (tileSx < 0 || tileSy < 0)
+    ? `scale(${tileSx < 0 ? -1 : 1}, ${tileSy < 0 ? -1 : 1})`
+    : "";
 
   const options = lootActors
     .map(a => `<option value="${a.id}"${a.id === currentId ? " selected" : ""}>${a.name}</option>`)
@@ -416,9 +460,10 @@ async function openLinkPicker(tileDoc) {
       <fieldset class="pf2e-cd-mer-hitzone-field">
         <legend>${game.i18n.localize("PF2E_CINEMATIC_MERCHANT.tile.clickAreaLegend")}</legend>
         <p class="pf2e-cd-mer-link-info">${game.i18n.localize("PF2E_CINEMATIC_MERCHANT.tile.clickAreaHint")}</p>
+        ${tileMirrorTransform ? `<p class="pf2e-cd-mer-link-warn">${game.i18n.localize("PF2E_CINEMATIC_MERCHANT.tile.clickAreaMirrorNote")}</p>` : ""}
         <div class="pf2e-cd-mer-hitzone-editor" data-role="hitzone-editor">
-          <div class="pf2e-cd-mer-hitzone-wrap">
-            <img class="pf2e-cd-mer-hitzone-img" src="${escapeHTML(tileImgSrc)}" alt="" draggable="false" />
+          <div class="pf2e-cd-mer-hitzone-wrap" data-mirror-x="${tileSx < 0 ? "1" : "0"}" data-mirror-y="${tileSy < 0 ? "1" : "0"}">
+            <img class="pf2e-cd-mer-hitzone-img" src="${escapeHTML(tileImgSrc)}" alt="" draggable="false" style="transform: scale(${tileSx < 0 ? -1 : 1}, ${tileSy < 0 ? -1 : 1});" />
             <div class="pf2e-cd-mer-hitzone-shade" data-role="hitzone-shade"></div>
             <div class="pf2e-cd-mer-hitzone-rect" data-role="hitzone-rect">
               <div class="pf2e-cd-mer-hitzone-handle" data-handle="nw"></div>
