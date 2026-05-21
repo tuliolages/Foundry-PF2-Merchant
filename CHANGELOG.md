@@ -2,6 +2,17 @@
 
 All notable changes are listed here. The version format follows [Semantic Versioning](https://semver.org/).
 
+## [0.1.4] — Revert to original category icons
+
+Reverts the icon swaps from v0.1.2 + v0.1.3 because the originals fit the room better:
+
+- Ammunition: `fa-feather-pointed` → `fa-bolt-lightning`
+- Container: `fa-box-archive` → `fa-suitcase`
+- Armor: `fa-vest` → `fa-shirt`
+- Equipment: `fa-cubes-stacked` → `fa-screwdriver-wrench`
+
+The per-category color theming and the soft halo behind each icon from v0.1.2 are kept.
+
 ## [0.1.3] — More fantasy-themed category icons
 
 - **Armor** now uses `fa-vest` (body-armor shape) instead of `fa-shirt` (which read as a modern T-shirt).
