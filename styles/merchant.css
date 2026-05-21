@@ -708,14 +708,51 @@
     0 0 0 1px var(--pf2e-mer-red);
 }
 .pf2e-cd-mer-cat-icon {
-  font-size: 38px;
-  color: var(--pf2e-mer-red);
-  transition: color 200ms ease, transform 200ms ease;
+  --cat-color: var(--pf2e-mer-red);
+  font-size: 34px;
+  color: var(--cat-color);
+  /* Subtle ring/halo behind the icon — gives each tile real visual weight
+     without overwhelming the parchment palette. */
+  width: 64px;
+  height: 64px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  background:
+    radial-gradient(circle at 50% 40%,
+      color-mix(in srgb, var(--cat-color) 22%, transparent) 0%,
+      color-mix(in srgb, var(--cat-color) 8%, transparent) 55%,
+      transparent 75%);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--cat-color) 25%, transparent);
+  transition: color 200ms ease, transform 200ms ease, box-shadow 200ms ease, background 200ms ease;
 }
 .pf2e-cd-mer-cat-tile:hover .pf2e-cd-mer-cat-icon {
-  color: var(--pf2e-mer-red-hover);
-  transform: scale(1.1);
+  transform: scale(1.08);
+  box-shadow:
+    inset 0 0 0 1px color-mix(in srgb, var(--cat-color) 45%, transparent),
+    0 0 18px color-mix(in srgb, var(--cat-color) 35%, transparent);
+  background:
+    radial-gradient(circle at 50% 40%,
+      color-mix(in srgb, var(--cat-color) 35%, transparent) 0%,
+      color-mix(in srgb, var(--cat-color) 12%, transparent) 55%,
+      transparent 75%);
 }
+
+/* === Per-category color theming — each category gets a recognisable tint
+       that fits the role (gold for treasure, green for potions, etc.). ===*/
+.pf2e-cd-mer-cat-tile[data-cat="all"]        .pf2e-cd-mer-cat-icon { --cat-color: #8b1010; }
+.pf2e-cd-mer-cat-tile[data-cat="weapon"]     .pf2e-cd-mer-cat-icon { --cat-color: #6b3a1a; }
+.pf2e-cd-mer-cat-tile[data-cat="armor"]      .pf2e-cd-mer-cat-icon { --cat-color: #5e4020; }
+.pf2e-cd-mer-cat-tile[data-cat="shield"]     .pf2e-cd-mer-cat-icon { --cat-color: #2a4a78; }
+.pf2e-cd-mer-cat-tile[data-cat="consumable"] .pf2e-cd-mer-cat-icon { --cat-color: #2d6b3a; }
+.pf2e-cd-mer-cat-tile[data-cat="ammunition"] .pf2e-cd-mer-cat-icon { --cat-color: #a05a18; }
+.pf2e-cd-mer-cat-tile[data-cat="equipment"]  .pf2e-cd-mer-cat-icon { --cat-color: #555555; }
+.pf2e-cd-mer-cat-tile[data-cat="treasure"]   .pf2e-cd-mer-cat-icon { --cat-color: #b8923a; }
+.pf2e-cd-mer-cat-tile[data-cat="backpack"]   .pf2e-cd-mer-cat-icon { --cat-color: #6b4a28; }
+.pf2e-cd-mer-cat-tile[data-cat="kit"]        .pf2e-cd-mer-cat-icon { --cat-color: #7a5418; }
+.pf2e-cd-mer-cat-tile[data-cat="__services"] .pf2e-cd-mer-cat-icon { --cat-color: #5e0000; }
+.pf2e-cd-mer-cat-tile[data-cat="__wishlist"] .pf2e-cd-mer-cat-icon { --cat-color: #b8923a; }
 .pf2e-cd-mer-cat-label {
   font-family: "Eczar", "Cinzel", Georgia, serif;
   font-size: 13px;
@@ -3554,7 +3591,7 @@ dialog.pf2e-cd-mer-dialog select:focus {
   background:
     radial-gradient(ellipse at 50% 30%, var(--pf2e-mer-parchment, #fff5d8) 0%, var(--pf2e-mer-cream-warm, #f4ecd8) 100%) !important;
 }
-.pf2e-cd-mer-cat-services .pf2e-cd-mer-cat-icon { color: var(--pf2e-mer-red, #5e0000) !important; }
+/* Per-category color set via --cat-color (see top of category-tile block). */
 .pf2e-cd-mer-cat-services .pf2e-cd-mer-cat-count { background: var(--pf2e-mer-red, #5e0000) !important; }
 .pf2e-cd-mer-cat-services.is-empty { opacity: 0.6; filter: grayscale(0.3); }
 
@@ -4564,9 +4601,7 @@ dialog.pf2e-cd-mer-dialog select:focus {
   background:
     radial-gradient(ellipse at 50% 30%, #fff5d8 0%, #f0d99f 100%) !important;
 }
-.pf2e-cd-mer-cat-wishlist .pf2e-cd-mer-cat-icon {
-  color: var(--pf2e-mer-gold, #785a28) !important;
-}
+/* Per-category color set via --cat-color (see top of category-tile block). */
 .pf2e-cd-mer-cat-wishlist .pf2e-cd-mer-cat-count {
   background: var(--pf2e-mer-gold, #785a28) !important;
 }

@@ -2,6 +2,13 @@
 
 All notable changes are listed here. The version format follows [Semantic Versioning](https://semver.org/).
 
+## [0.1.2] — Prettier category tiles
+
+- Each category tile now has its own thematic color (gold for treasure, green for consumables, brown for armor and containers, steel-blue for shields, etc.) — instant visual recognition.
+- Soft circular halo behind every icon with a per-category tint; hover ramps the glow and scales the icon, no more uniform red wall.
+- Ammunition icon swapped from a lightning bolt (`fa-bolt-lightning`) to a feathered shaft (`fa-feather-pointed`) — less ambiguous when the same word means both electric and projectile.
+- Container icon swapped from a modern suitcase to a chest archive (`fa-box-archive`) to fit the fantasy vibe.
+
 ## [0.1.1] — Display tweaks
 
 - `formatCopper` collapses platinum into gold for display (`10 pp` → `100 gp`, `10 pp 5 gp` → `105 gp`). PF2e tables reckon in gp regardless of magnitude; pp is mostly a book-side shorthand. sp + cp keep their own denominations. Input fields that let GMs type prices in pp/gp/sp/cp are unaffected — only the rendered total changes.
