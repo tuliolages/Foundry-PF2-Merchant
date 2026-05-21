@@ -419,11 +419,15 @@ export function copperToCoins(cp) {
 /** Format copper as a compact PF2E price string ("3 gp 5 sp"). */
 export function formatCopper(cp) {
   if (cp == null || cp <= 0) return "—";
+  // PF2e players normally reckon in gp; collapse pp into gp (1 pp = 10 gp)
+  // so "10 pp" reads as "100 gp" instead. Keep sp + cp as-is since those
+  // are the small-change denominations that don't roll up.
   const coins = copperToCoins(cp);
+  const gp = (Number(coins.pp) || 0) * 10 + (Number(coins.gp) || 0);
   const parts = [];
-  for (const [coin, n] of Object.entries(coins)) {
-    if (n > 0) parts.push(`${n} ${coin}`);
-  }
+  if (gp > 0) parts.push(`${gp} gp`);
+  if (coins.sp > 0) parts.push(`${coins.sp} sp`);
+  if (coins.cp > 0) parts.push(`${coins.cp} cp`);
   return parts.length > 0 ? parts.join(" ") : "—";
 }
 
