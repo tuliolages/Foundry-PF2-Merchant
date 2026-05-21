@@ -2,6 +2,12 @@
 
 All notable changes are listed here. The version format follows [Semantic Versioning](https://semver.org/).
 
+## [0.1.3] — More fantasy-themed category icons
+
+- **Armor** now uses `fa-vest` (body-armor shape) instead of `fa-shirt` (which read as a modern T-shirt).
+- **Equipment** now uses `fa-cubes-stacked` (a pile of crates / adventurer's gear) instead of `fa-screwdriver-wrench` (which read as a modern hardware-store toolkit).
+- Same icon set is now applied consistently in the merchant window, the random-stock dialog, and the compendium import dialog (was out of sync between the three).
+
 ## [0.1.2] — Prettier category tiles
 
 - Each category tile now has its own thematic color (gold for treasure, green for consumables, brown for armor and containers, steel-blue for shields, etc.) — instant visual recognition.

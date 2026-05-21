@@ -17,13 +17,13 @@ const ALLOWED_TYPES = new Set([
 ]);
 const CATEGORY_CHIPS = [
   { value: "weapon",     icon: "fa-hammer",              labelKey: "PF2E_CINEMATIC_MERCHANT.cat.weapon" },
-  { value: "armor",      icon: "fa-shirt",               labelKey: "PF2E_CINEMATIC_MERCHANT.cat.armor" },
+  { value: "armor",      icon: "fa-vest",                labelKey: "PF2E_CINEMATIC_MERCHANT.cat.armor" },
   { value: "shield",     icon: "fa-shield-halved",       labelKey: "PF2E_CINEMATIC_MERCHANT.cat.shield" },
   { value: "consumable", icon: "fa-flask",               labelKey: "PF2E_CINEMATIC_MERCHANT.cat.consumable" },
-  { value: "ammunition", icon: "fa-bolt-lightning",      labelKey: "PF2E_CINEMATIC_MERCHANT.cat.ammunition" },
-  { value: "equipment",  icon: "fa-screwdriver-wrench",  labelKey: "PF2E_CINEMATIC_MERCHANT.cat.equipment" },
+  { value: "ammunition", icon: "fa-feather-pointed",     labelKey: "PF2E_CINEMATIC_MERCHANT.cat.ammunition" },
+  { value: "equipment",  icon: "fa-cubes-stacked",       labelKey: "PF2E_CINEMATIC_MERCHANT.cat.equipment" },
   { value: "treasure",   icon: "fa-gem",                 labelKey: "PF2E_CINEMATIC_MERCHANT.cat.treasure" },
-  { value: "backpack",   icon: "fa-suitcase",            labelKey: "PF2E_CINEMATIC_MERCHANT.cat.container" },
+  { value: "backpack",   icon: "fa-box-archive",         labelKey: "PF2E_CINEMATIC_MERCHANT.cat.container" },
   { value: "kit",        icon: "fa-toolbox",             labelKey: "PF2E_CINEMATIC_MERCHANT.cat.kit" },
 ];
 const RARITIES = ["common", "uncommon", "rare", "unique"];
