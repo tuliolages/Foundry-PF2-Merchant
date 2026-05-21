@@ -2,6 +2,10 @@
 
 All notable changes are listed here. The version format follows [Semantic Versioning](https://semver.org/).
 
+## [0.1.1] — Display tweaks
+
+- `formatCopper` collapses platinum into gold for display (`10 pp` → `100 gp`, `10 pp 5 gp` → `105 gp`). PF2e tables reckon in gp regardless of magnitude; pp is mostly a book-side shorthand. sp + cp keep their own denominations. Input fields that let GMs type prices in pp/gp/sp/cp are unaffected — only the rendered total changes.
+
 ## [0.1.0] — Initial public release
 
 The first publicly available build of **PF2e Merchant**. Bundles everything below.
