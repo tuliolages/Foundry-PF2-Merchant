@@ -2,6 +2,12 @@
 
 All notable changes are listed here. The version format follows [Semantic Versioning](https://semver.org/).
 
+## [0.1.5] — Category tiles back to plain palette
+
+- Removed the circular halo / ring behind category icons (introduced in v0.1.2).
+- Removed the per-category color tinting; back to the uniform red palette.
+- Kept the on-hover glow — now radiates from the icon itself via `text-shadow` instead of a ring backdrop.
+
 ## [0.1.4] — Revert to original category icons
 
 Reverts the icon swaps from v0.1.2 + v0.1.3 because the originals fit the room better:
