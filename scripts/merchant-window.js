@@ -167,6 +167,7 @@ export class MerchantWindow {
       magicalSel:   root.querySelector("[name=mer-magical]"),
       filtersAdv:   root.querySelector("[data-role=merchant-filters-advanced]"),
       filtersToggleBtn: root.querySelector("[data-action=filters-toggle]"),
+      filtersResetBtn:  root.querySelector("[data-action=filters-reset]"),
       filtersBar:   root.querySelector(".pf2e-cd-mer-filters"),
       backBar:      root.querySelector(".pf2e-cd-mer-back-bar"),
       backBtn:      root.querySelector("[data-action=back]"),
@@ -760,6 +761,15 @@ export class MerchantWindow {
       if (this.refs.filtersAdv) this.refs.filtersAdv.hidden = collapsed;
       const chev = this.refs.filtersToggleBtn.querySelector("i");
       if (chev) chev.className = collapsed ? "fa-solid fa-chevron-down" : "fa-solid fa-chevron-up";
+    });
+    this.refs.filtersResetBtn?.addEventListener("click", () => {
+      // Reset every filter EXCEPT the current category (the user is here on
+      // purpose). Search, rarity, level, sort, affordable, wishlist, and
+      // every advanced dropdown go back to their default.
+      const keepCat = this.filters.category;
+      this._resetAllFilters();
+      this.filters.category = keepCat;
+      this._renderItems();
     });
 
     if (this.refs.compareOpenBtn) this.refs.compareOpenBtn.addEventListener("click", () => this._openCompareModal());
@@ -3004,6 +3014,10 @@ export class MerchantWindow {
                   <input type="checkbox" name="mer-wishlist" />
                   <span><i class="fa-solid fa-bookmark"></i> ${game.i18n.localize("PF2E_CINEMATIC_MERCHANT.filter.wishlist")}</span>
                 </label>
+                <button type="button" class="pf2e-cd-mer-filters-reset" data-action="filters-reset" title="${game.i18n.localize("PF2E_CINEMATIC_MERCHANT.filter.resetTooltip")}">
+                  <i class="fa-solid fa-rotate-left"></i>
+                  <span>${game.i18n.localize("PF2E_CINEMATIC_MERCHANT.filter.reset")}</span>
+                </button>
                 <button type="button" class="pf2e-cd-mer-filters-toggle" data-action="filters-toggle">
                   <i class="fa-solid fa-chevron-down"></i>
                   <span>${game.i18n.localize("PF2E_CINEMATIC_MERCHANT.picker.filtersToggle")}</span>

@@ -202,6 +202,38 @@
 .pf2e-cd-mer-picker-filters-toggle:hover {
   background: rgba(120, 90, 40, 0.35);
 }
+/* Reset-filters button — same chip styling as the chevron-toggle but
+   coloured red so it reads as a destructive / "clear" action. Sits to the
+   LEFT of the chevron-toggle (margin-left: auto pushes it to the right
+   edge of the primary row, the toggle then sits right after). */
+.pf2e-cd-mer-filters-reset {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 4px 10px;
+  font-family: "Eczar", Georgia, serif;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+  background: rgba(94, 0, 0, 0.12);
+  border: 1px solid var(--pf2e-mer-red);
+  border-radius: 3px;
+  color: var(--pf2e-mer-red);
+  cursor: pointer;
+  margin-left: auto;
+  transition: background 140ms ease, color 140ms ease;
+}
+.pf2e-cd-mer-filters-reset:hover {
+  background: var(--pf2e-mer-red);
+  color: var(--pf2e-mer-cream-warm);
+}
+/* When the reset button is present, the toggle no longer needs to push
+   itself to the right via margin-left:auto — the reset already took that
+   slot. The toggle now naturally sits next to the reset. */
+.pf2e-cd-mer-filters-reset + .pf2e-cd-mer-filters-toggle {
+  margin-left: 0;
+}
 
 /* === Hit-zone editor (in tile-link dialog) === */
 .pf2e-cd-mer-hitzone-field {

@@ -259,6 +259,8 @@
   "PF2E_CINEMATIC_MERCHANT.window.editOfferFor": "Tagesangebot für {item}",
   "PF2E_CINEMATIC_MERCHANT.window.editOfferHint": "0 = kein Angebot. Werte 5–95 = Rabatt in Prozent. Wirkt auf den Kaufpreis.",
   "PF2E_CINEMATIC_MERCHANT.filter.wishlist": "Nur Wunschliste",
+  "PF2E_CINEMATIC_MERCHANT.filter.reset": "Filter zurücksetzen",
+  "PF2E_CINEMATIC_MERCHANT.filter.resetTooltip": "Setzt Suche, Seltenheit, Level, Sortierung und alle erweiterten Filter auf Standard zurück (die aktuelle Kategorie bleibt).",
 
   "PF2E_CINEMATIC_MERCHANT.cart.title": "Warenkorb",
   "PF2E_CINEMATIC_MERCHANT.cart.empty": "Dein Warenkorb ist leer.",

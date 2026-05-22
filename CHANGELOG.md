@@ -2,6 +2,10 @@
 
 All notable changes are listed here. The version format follows [Semantic Versioning](https://semver.org/).
 
+## [0.1.6] — Reset-filters button
+
+- New "Reset filters" button in the merchant window's filter bar (left of the chevron toggle). One click clears search, rarity, level range, sort, affordable-only, wishlist-only, and every advanced dropdown (usage, group, bulk, magical). The current category stays selected so you don't get bumped back to "all items" — the rest is wiped.
+
 ## [0.1.5] — Category tiles back to plain palette
 
 - Removed the circular halo / ring behind category icons (introduced in v0.1.2).

@@ -259,6 +259,8 @@
   "PF2E_CINEMATIC_MERCHANT.window.editOfferFor": "Daily offer for {item}",
   "PF2E_CINEMATIC_MERCHANT.window.editOfferHint": "0 = no offer. 5–95 = discount in percent. Applied to the buy price.",
   "PF2E_CINEMATIC_MERCHANT.filter.wishlist": "Wishlist only",
+  "PF2E_CINEMATIC_MERCHANT.filter.reset": "Reset filters",
+  "PF2E_CINEMATIC_MERCHANT.filter.resetTooltip": "Resets search, rarity, level, sort and every advanced filter to default (the current category is kept).",
 
   "PF2E_CINEMATIC_MERCHANT.cart.title": "Shopping cart",
   "PF2E_CINEMATIC_MERCHANT.cart.empty": "Your cart is empty.",
