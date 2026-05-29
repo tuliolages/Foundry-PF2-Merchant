@@ -2,6 +2,12 @@
 
 All notable changes are listed here. The version format follows [Semantic Versioning](https://semver.org/).
 
+## [0.1.7] — Refuse-to-buy-by-rarity
+
+- New per-merchant setting: pick which item rarities the merchant **refuses to buy** from players. Default = accept everything; check Rare / Unique to make this merchant a common-goods-only dealer.
+- In the Sell-to-Merchant dialog, refused-rarity items render grayed out with a red "refused" tag and a disabled "Refused" button instead of the usual "Sell" — players see why they can't unload it.
+- Same check enforced on both the direct sell path and the GM-relay sell path in `gm-ops.js`, plus the drag-drop-onto-merchant flow. UI bypass can't sneak a sale through.
+
 ## [0.1.6] — Reset-filters button
 
 - New "Reset filters" button in the merchant window's filter bar (left of the chevron toggle). One click clears search, rarity, level range, sort, affordable-only, wishlist-only, and every advanced dropdown (usage, group, bulk, magical). The current category stays selected so you don't get bumped back to "all items" — the rest is wiped.

@@ -1,6 +1,6 @@
 // Modal listing the player's inventory with Sell buttons per item.
 
-import { MODULE_ID, priceToCopper, formatCopper, getMerchantSellRate, isCoinItem } from "./merchant-store.js";
+import { MODULE_ID, priceToCopper, formatCopper, getMerchantSellRate, isCoinItem, isRarityRefused } from "./merchant-store.js";
 import { makeDraggable } from "./draggable.js";
 
 const SELLABLE_TYPES = new Set([
@@ -219,14 +219,27 @@ class SellListModal {
     const qty = Number(item.system?.quantity ?? 1);
     const lvl = Number(item.system?.level?.value ?? 0);
     const rarity = item.system?.traits?.rarity ?? "common";
-    const qtySelector = qty > 1 ? `
+    const refused = isRarityRefused(this.merchant, rarity);
+    const qtySelector = (!refused && qty > 1) ? `
       <div class="pf2e-cd-mer-qty">
         <button type="button" class="pf2e-cd-mer-qty-btn" data-action="qty-minus" data-item-id="${item.id}" tabindex="-1">−</button>
         <input type="number" class="pf2e-cd-mer-qty-input" data-role="qty-input" data-item-id="${item.id}" value="1" min="1" max="${qty}" />
         <button type="button" class="pf2e-cd-mer-qty-btn" data-action="qty-plus" data-item-id="${item.id}" tabindex="-1">+</button>
       </div>` : "";
+    const sellBtn = refused
+      ? `<button type="button" class="pf2e-cd-mer-sell-row-btn is-refused" disabled title="${escapeHTML(t("PF2E_CINEMATIC_MERCHANT.sell.refusedTooltip"))}">
+          <i class="fa-solid fa-ban"></i>
+          <span>${escapeHTML(t("PF2E_CINEMATIC_MERCHANT.sell.refusedBtn"))}</span>
+         </button>`
+      : `<button type="button" class="pf2e-cd-mer-sell-row-btn" data-action="sell" data-item-id="${item.id}">
+          <i class="fa-solid fa-coins"></i>
+          <span>${escapeHTML(t("PF2E_CINEMATIC_MERCHANT.sell.sellBtn"))}</span>
+         </button>`;
+    const priceCell = refused
+      ? `<div class="pf2e-cd-mer-sell-row-price is-refused">—</div>`
+      : `<div class="pf2e-cd-mer-sell-row-price" data-role="sell-price" data-item-id="${item.id}" data-unit-cp="${sellCp}">${formatCopper(sellCp)}</div>`;
     return `
-      <div class="pf2e-cd-mer-sell-row rarity-${rarity}">
+      <div class="pf2e-cd-mer-sell-row rarity-${rarity}${refused ? " is-refused" : ""}">
         <img class="pf2e-cd-mer-sell-row-img" src="${escapeHTML(item.img ?? "icons/svg/item-bag.svg")}" alt="" />
         <div class="pf2e-cd-mer-sell-row-info">
           <div class="pf2e-cd-mer-sell-row-name">${escapeHTML(item.name)}</div>
@@ -235,14 +248,12 @@ class SellListModal {
             <span class="tag tag-rarity rarity-${rarity}">${escapeHTML(localizeRarity(rarity))}</span>
             <span class="tag tag-level">L ${lvl}</span>
             ${qty > 1 ? `<span class="tag tag-qty">×${qty}</span>` : ""}
+            ${refused ? `<span class="tag tag-refused"><i class="fa-solid fa-ban"></i> ${escapeHTML(t("PF2E_CINEMATIC_MERCHANT.sell.refusedBadge"))}</span>` : ""}
           </div>
         </div>
-        <div class="pf2e-cd-mer-sell-row-price" data-role="sell-price" data-item-id="${item.id}" data-unit-cp="${sellCp}">${formatCopper(sellCp)}</div>
+        ${priceCell}
         ${qtySelector}
-        <button type="button" class="pf2e-cd-mer-sell-row-btn" data-action="sell" data-item-id="${item.id}">
-          <i class="fa-solid fa-coins"></i>
-          <span>${escapeHTML(t("PF2E_CINEMATIC_MERCHANT.sell.sellBtn"))}</span>
-        </button>
+        ${sellBtn}
       </div>
     `;
   }

@@ -161,6 +161,34 @@ export async function setMerchantRarityDiscounts(actor, discounts) {
   return actor.update({ [`flags.${MODULE_ID}.rarityDiscounts`]: clean });
 }
 
+// --- Refused rarities (what the merchant will NOT buy from players) -------
+
+/**
+ * Set of item rarities the merchant refuses to buy from players. Defaults to
+ * empty (= accept everything). Stored as an array of rarity strings on the
+ * actor's flags.
+ */
+export function getMerchantRefusedRarities(actor) {
+  const v = actor?.flags?.[MODULE_ID]?.refusedRarities;
+  if (!Array.isArray(v)) return new Set();
+  return new Set(v.filter(r => RARITIES.includes(r)));
+}
+
+/** True if the merchant refuses to buy items of this rarity. */
+export function isRarityRefused(actor, rarity) {
+  if (!rarity) return false;
+  return getMerchantRefusedRarities(actor).has(rarity);
+}
+
+export async function setMerchantRefusedRarities(actor, rarities) {
+  if (!actor) return;
+  const clean = Array.from(new Set(
+    (Array.isArray(rarities) ? rarities : [])
+      .filter(r => RARITIES.includes(r))
+  ));
+  return actor.update({ [`flags.${MODULE_ID}.refusedRarities`]: clean });
+}
+
 // --- Item identity (for merging duplicate stacks on a merchant) ---
 
 /**

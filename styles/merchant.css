@@ -1440,6 +1440,57 @@
   border-radius: 2px;
 }
 .pf2e-cd-mer-sell-row:hover { background: #fffaeb; }
+/* Refused-rarity rows — grayed, no hover lift, sell button replaced with a
+   disabled "Refused" badge button. */
+.pf2e-cd-mer-sell-row.is-refused {
+  opacity: 0.55;
+  filter: grayscale(0.4);
+}
+.pf2e-cd-mer-sell-row.is-refused:hover { background: var(--pf2e-mer-parchment); }
+.pf2e-cd-mer-sell-row-price.is-refused {
+  color: rgba(50, 25, 10, 0.45);
+  font-style: italic;
+}
+.pf2e-cd-mer-sell-row-btn.is-refused {
+  background: rgba(94, 0, 0, 0.18);
+  border-color: var(--pf2e-mer-red);
+  color: var(--pf2e-mer-red);
+  cursor: not-allowed;
+}
+.pf2e-cd-mer-sell-row-meta .tag-refused {
+  background: rgba(94, 0, 0, 0.18);
+  color: var(--pf2e-mer-red);
+  border: 1px solid var(--pf2e-mer-red);
+  font-weight: 700;
+  text-transform: uppercase;
+  font-size: 9px;
+  letter-spacing: 0.5px;
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  padding: 1px 5px;
+  border-radius: 2px;
+}
+
+/* === Settings dialog: refuse-by-rarity checkboxes === */
+.pf2e-cd-mer-settings-refused-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 6px 12px;
+  margin-top: 4px;
+}
+.pf2e-cd-mer-settings-refused-row {
+  display: flex !important;
+  flex-direction: row !important;
+  align-items: center;
+  gap: 6px;
+  font-family: "Eczar", Georgia, serif;
+  font-size: 12px;
+}
+.pf2e-cd-mer-settings-refused-row span {
+  font-weight: 700;
+  letter-spacing: 0.5px;
+}
 .pf2e-cd-mer-sell-row.rarity-uncommon { border-left-color: var(--pf2e-mer-uncommon); }
 .pf2e-cd-mer-sell-row.rarity-rare     { border-left-color: var(--pf2e-mer-rare); }
 .pf2e-cd-mer-sell-row.rarity-unique   { border-left-color: var(--pf2e-mer-unique); }

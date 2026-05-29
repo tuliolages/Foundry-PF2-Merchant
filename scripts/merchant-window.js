@@ -31,6 +31,9 @@ import {
   getMerchantCharacterDiscounts,
   setMerchantCharacterDiscounts,
   effectiveSellRate,
+  getMerchantRefusedRarities,
+  setMerchantRefusedRarities,
+  isRarityRefused,
   normalizeMerchantType,
   getMerchantServices,
   addMerchantService,
@@ -1136,6 +1139,16 @@ export class MerchantWindow {
   async _sellItem(item, requestedQty = 1) {
     if (!this.viewer || !this.actor || !item) return;
     if (item.parent?.id !== this.viewer.id) return;
+    // Merchants can refuse certain rarities — guard here in case the UI
+    // is bypassed (drag-drop or socket call).
+    const rarity = item.system?.traits?.rarity ?? "common";
+    if (isRarityRefused(this.actor, rarity)) {
+      ui.notifications?.warn(game.i18n.format("PF2E_CINEMATIC_MERCHANT.warn.merchantRefuses", {
+        merchant: this.actor.name,
+        rarity: localizeRarity(rarity),
+      }));
+      return;
+    }
     const baseCp = priceToCopper(item.system?.price);
     const rate = getMerchantSellRate(this.actor);
     const unitCp = Math.floor(baseCp * rate);
@@ -1186,6 +1199,7 @@ export class MerchantWindow {
     const sellRate = getMerchantSellRate(this.actor);
     const greetingSounds = [...getMerchantGreetingSounds(this.actor)];
     const charDiscounts = { ...getMerchantCharacterDiscounts(this.actor) };
+    const refusedRarities = getMerchantRefusedRarities(this.actor);
     // Collect player characters — type:"character" actors owned by any non-GM.
     const playerCharacters = (game.actors ?? []).filter(a => {
       if (a.type !== "character") return false;
@@ -1234,6 +1248,18 @@ export class MerchantWindow {
           </div>
         </fieldset>
         <p class="pf2e-cd-mer-info">${game.i18n.localize("PF2E_CINEMATIC_MERCHANT.settings.discountHint")}</p>
+        <fieldset>
+          <legend>${game.i18n.localize("PF2E_CINEMATIC_MERCHANT.settings.refusedRarities")}</legend>
+          <p class="pf2e-cd-mer-info">${game.i18n.localize("PF2E_CINEMATIC_MERCHANT.settings.refusedRaritiesHint")}</p>
+          <div class="pf2e-cd-mer-settings-refused-grid">
+            ${["common","uncommon","rare","unique"].map(r => `
+              <label class="pf2e-cd-mer-settings-refused-row">
+                <input type="checkbox" name="ref-${r}"${refusedRarities.has(r) ? " checked" : ""} />
+                <span>${escapeHTML(localizeRarity(r))}</span>
+              </label>
+            `).join("")}
+          </div>
+        </fieldset>
         ${playerCharacters.length > 0 ? `
           <fieldset class="pf2e-cd-mer-char-discounts-field">
             <legend>${game.i18n.localize("PF2E_CINEMATIC_MERCHANT.settings.characterDiscounts")}</legend>
@@ -1288,11 +1314,15 @@ export class MerchantWindow {
               newCharDiscounts[cid] = Math.max(-1, Math.min(1, raw / 100));
             }
           }
+          // Refused rarities — checkboxes are "refuse to buy this rarity".
+          const newRefused = ["common","uncommon","rare","unique"]
+            .filter(r => root?.querySelector(`[name=ref-${r}]`)?.checked);
           await setMerchantMarkup(this.actor, markupV);
           await setMerchantSellRate(this.actor, sellV);
           await setMerchantRarityDiscounts(this.actor, newDiscounts);
           await setMerchantGreetingSounds(this.actor, greetingSounds);
           await setMerchantCharacterDiscounts(this.actor, newCharDiscounts);
+          await setMerchantRefusedRarities(this.actor, newRefused);
           this._refreshHeader();
           this._renderItems();
           this._refreshGold();
@@ -2845,6 +2875,14 @@ export class MerchantWindow {
     if (!item) return;
     if (item.parent?.id !== this.viewer.id) {
       ui.notifications?.warn(game.i18n.localize("PF2E_CINEMATIC_MERCHANT.warn.sellNotYours"));
+      return;
+    }
+    const rarity = item.system?.traits?.rarity ?? "common";
+    if (isRarityRefused(this.actor, rarity)) {
+      ui.notifications?.warn(game.i18n.format("PF2E_CINEMATIC_MERCHANT.warn.merchantRefuses", {
+        merchant: this.actor.name,
+        rarity: localizeRarity(rarity),
+      }));
       return;
     }
     const baseCp = priceToCopper(item.system?.price);

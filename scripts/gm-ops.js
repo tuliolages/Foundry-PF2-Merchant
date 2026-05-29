@@ -11,6 +11,7 @@ import {
   setMerchantCoins,
   readMerchantCoins,
   recordMerchantTransaction,
+  isRarityRefused,
 } from "./merchant-store.js";
 import { registerHandler } from "./socket-bridge.js";
 
@@ -88,6 +89,9 @@ export function registerGMHandlers() {
     const viewer = game.actors?.get?.(viewerId);
     const item = viewer?.items?.get?.(itemId);
     if (!merchant || !viewer || !item) throw new Error("merchant.sell: missing actor or item");
+
+    const rarity = item.system?.traits?.rarity ?? "common";
+    if (isRarityRefused(merchant, rarity)) throw new Error(`merchant_refuses:${rarity}`);
 
     const baseCp = priceToCopper(item.system?.price);
     const rate = getMerchantSellRate(merchant);
