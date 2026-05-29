@@ -2,7 +2,7 @@
   "id": "pf2e-cinematic-merchant",
   "title": "PF2e Merchant",
   "description": "Click-a-tile merchant shops for Pathfinder 2e. Link a Loot actor to any scene tile, fill it from the compendium browser or weighted random stock, add per-character discounts, daily offers, services, a transaction history and alpha-aware tile click areas — all in a single drag/resize/popout-capable parchment window.",
-  "version": "0.1.8",
+  "version": "0.1.9",
   "compatibility": {
     "minimum": "13",
     "verified": "13",

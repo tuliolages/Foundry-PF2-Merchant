@@ -3398,23 +3398,39 @@ dialog.pf2e-cd-mer-qty-dialog,
 .pf2e-cd-mer-settings-form input[type=text],
 .pf2e-cd-mer-settings-form textarea,
 /* Cap the settings dialog at 90vh so the Save / Cancel footer buttons stay
-   visible no matter how long the form gets (greeting sounds + per-rarity
-   discounts + refused rarities + character discounts can blow past 1500px
-   of content on busy merchants). The form body scrolls inside. */
+   visible no matter how long the form gets. The form body scrolls inside;
+   the footer sits sticky at the bottom of window-content as a belt-and-
+   suspenders fix in case Foundry's flex defaults differ in V13/V14. */
 .pf2e-cd-mer-settings-dialog {
   max-height: 90vh !important;
 }
 .pf2e-cd-mer-settings-dialog .window-content {
-  max-height: calc(90vh - 80px); /* leave room for header + footer */
-  overflow: hidden !important;
-  display: flex;
-  flex-direction: column;
+  max-height: calc(90vh - 60px) !important;
+  overflow-y: auto !important;
+  overflow-x: hidden !important;
+  display: flex !important;
+  flex-direction: column !important;
+  position: relative;
 }
 .pf2e-cd-mer-settings-dialog .pf2e-cd-mer-settings-form {
-  flex: 1 1 auto;
-  min-height: 0;
-  overflow-y: auto;
-  padding-right: 4px;
+  flex: 1 1 auto !important;
+  min-height: 0 !important;
+}
+/* Make every Foundry-injected footer / button-row stick to the bottom so
+   Save + Cancel are always within reach regardless of how the inner form
+   is laid out. */
+.pf2e-cd-mer-settings-dialog .window-content > footer,
+.pf2e-cd-mer-settings-dialog .window-content > .form-footer,
+.pf2e-cd-mer-settings-dialog .window-content > .dialog-buttons,
+.pf2e-cd-mer-settings-dialog footer.form-footer,
+.pf2e-cd-mer-settings-dialog footer.dialog-buttons {
+  position: sticky !important;
+  bottom: 0 !important;
+  background: var(--pf2e-mer-parchment, #fff5d8) !important;
+  margin: 8px -8px -8px !important;
+  padding: 10px 8px !important;
+  border-top: 1px solid var(--pf2e-mer-gold) !important;
+  z-index: 5;
 }
 
 .application.pf2e-cd-mer-settings-dialog input[type=number],

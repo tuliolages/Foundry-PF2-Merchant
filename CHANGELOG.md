@@ -2,6 +2,13 @@
 
 All notable changes are listed here. The version format follows [Semantic Versioning](https://semver.org/).
 
+## [0.1.9] — Settings dialog scroll fix, take 2
+
+The previous fix didn't take because Foundry V13's DialogV2 footer sits inside `.window-content` and the per-rule flex hierarchy needed `!important` to stick. New approach:
+
+- `.window-content` now uses `overflow-y: auto` directly with `max-height: calc(90vh - 60px)`.
+- Foundry's button footer (`footer.form-footer` / `footer.dialog-buttons` / inline `<footer>` inside `.window-content`) is forced to `position: sticky; bottom: 0` with a parchment background + gold top-border. Save and Cancel stay pinned at the bottom of the dialog while the rest of the form scrolls behind.
+
 ## [0.1.8] — Settings dialog stays scrollable
 
 - Cap merchant Settings dialog at 90vh and let the inner form scroll instead of growing past the viewport. The Save / Cancel buttons now stay reachable even when the merchant has greeting sounds, rarity discounts, refused rarities, AND character discounts all configured at the same time.
