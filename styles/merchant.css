@@ -3397,6 +3397,26 @@ dialog.pf2e-cd-mer-qty-dialog,
 .pf2e-cd-mer-settings-form input[type=number],
 .pf2e-cd-mer-settings-form input[type=text],
 .pf2e-cd-mer-settings-form textarea,
+/* Cap the settings dialog at 90vh so the Save / Cancel footer buttons stay
+   visible no matter how long the form gets (greeting sounds + per-rarity
+   discounts + refused rarities + character discounts can blow past 1500px
+   of content on busy merchants). The form body scrolls inside. */
+.pf2e-cd-mer-settings-dialog {
+  max-height: 90vh !important;
+}
+.pf2e-cd-mer-settings-dialog .window-content {
+  max-height: calc(90vh - 80px); /* leave room for header + footer */
+  overflow: hidden !important;
+  display: flex;
+  flex-direction: column;
+}
+.pf2e-cd-mer-settings-dialog .pf2e-cd-mer-settings-form {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  padding-right: 4px;
+}
+
 .application.pf2e-cd-mer-settings-dialog input[type=number],
 .application.pf2e-cd-mer-settings-dialog input[type=text],
 .application.pf2e-cd-mer-settings-dialog textarea,

@@ -2,6 +2,10 @@
 
 All notable changes are listed here. The version format follows [Semantic Versioning](https://semver.org/).
 
+## [0.1.8] — Settings dialog stays scrollable
+
+- Cap merchant Settings dialog at 90vh and let the inner form scroll instead of growing past the viewport. The Save / Cancel buttons now stay reachable even when the merchant has greeting sounds, rarity discounts, refused rarities, AND character discounts all configured at the same time.
+
 ## [0.1.7] — Refuse-to-buy-by-rarity
 
 - New per-merchant setting: pick which item rarities the merchant **refuses to buy** from players. Default = accept everything; check Rare / Unique to make this merchant a common-goods-only dealer.
