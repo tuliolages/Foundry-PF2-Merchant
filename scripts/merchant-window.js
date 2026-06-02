@@ -600,11 +600,17 @@ export class MerchantWindow {
 
   _postTransactionLog() {
     if (!this.transactions || this.transactions.length === 0) return;
+    this._postTransactionLogEntries(this.transactions);
+    this.transactions = [];
+  }
+
+  _postTransactionLogEntries(entries) {
+    if (!entries || entries.length === 0) return;
     const merchantName = escapeHTML(this.actor?.name ?? "—");
     const viewerName = escapeHTML(this.viewer?.name ?? "—");
     let totalBuy = 0;
     let totalSell = 0;
-    const lines = this.transactions.map(t => {
+    const lines = entries.map(t => {
       if (t.kind === "buy") totalBuy += t.cp;
       else totalSell += t.cp;
       const verb = game.i18n.localize(t.kind === "buy"
@@ -639,12 +645,33 @@ export class MerchantWindow {
     } catch (err) {
       console.warn(`${MODULE_ID} | transaction log post failed:`, err);
     }
-    this.transactions = [];
+  }
+
+  _postTransactionChat(kind, name, qty, cp) {
+    const isSell = kind === "sell";
+    const cls = isSell ? "sell" : "buy";
+    const verb = game.i18n.localize(isSell
+      ? "PF2E_CINEMATIC_MERCHANT.chat.sold"
+      : "PF2E_CINEMATIC_MERCHANT.chat.bought");
+    const direction = game.i18n.localize(isSell
+      ? "PF2E_CINEMATIC_MERCHANT.chat.to"
+      : "PF2E_CINEMATIC_MERCHANT.chat.from");
+    const qtyTag = qty > 1 ? ` <span class="pf2e-cd-mer-chat-qty">&times;${qty}</span>` : "";
+    const content = `<div class="pf2e-cd-mer-chat-${cls}"><strong>${escapeHTML(this.viewer?.name ?? "-")}</strong> ${verb} <strong>${escapeHTML(name)}</strong>${qtyTag} ${direction} <em>${escapeHTML(this.actor?.name ?? "-")}</em> ${game.i18n.localize("PF2E_CINEMATIC_MERCHANT.chat.for")} ${formatCopper(cp)}.</div>`;
+    try {
+      ChatMessage.create({
+        speaker: ChatMessage.getSpeaker({ actor: this.viewer ?? this.actor }),
+        content,
+      });
+    } catch (err) {
+      console.warn(`${MODULE_ID} | transaction chat post failed:`, err);
+    }
   }
 
   _logTransaction(kind, name, qty, cp, opts = {}) {
     const when = Date.now();
-    this.transactions.push({ kind, name, qty, cp, when });
+    if (opts.session !== false) this.transactions.push({ kind, name, qty, cp, when });
+    if (opts.postChat) this._postTransactionChat(kind, name, qty, cp);
     // Best-effort persistent log on the merchant actor. Players who reached
     // this path have owner permission (granted by ensureMerchantOwnership),
     // so the actor.update inside recordMerchantTransaction will succeed for
@@ -812,7 +839,7 @@ export class MerchantWindow {
 
   _onItemListClick(e) {
     // Don't treat clicks on the qty input or compare button as a row open.
-    if (e.target.closest("[data-role=qty-input]") || e.target.closest(".pf2e-cd-mer-compare-btn")) {
+    if (e.target.closest("[data-role=qty-input]") || e.target.closest("[data-role=service-qty-input]") || e.target.closest(".pf2e-cd-mer-service-qty") || e.target.closest(".pf2e-cd-mer-compare-btn")) {
       e.stopPropagation();
       return;
     }
@@ -835,6 +862,10 @@ export class MerchantWindow {
     const delBtn  = e.target.closest("[data-action=delete]");
     if (delBtn)  { e.stopPropagation(); this._handleDelete(delBtn.dataset.itemId); return; }
     // Service handlers
+    const svcQtyMinus = e.target.closest("[data-action=service-qty-minus]");
+    if (svcQtyMinus) { e.stopPropagation(); this._adjustServiceQty(svcQtyMinus.dataset.serviceId, -1); return; }
+    const svcQtyPlus = e.target.closest("[data-action=service-qty-plus]");
+    if (svcQtyPlus) { e.stopPropagation(); this._adjustServiceQty(svcQtyPlus.dataset.serviceId, +1); return; }
     const svcBuy = e.target.closest("[data-action=service-buy]");
     if (svcBuy) { e.stopPropagation(); this._handleBuyService(svcBuy.dataset.serviceId); return; }
     const svcAdd = e.target.closest("[data-action=service-add]");
@@ -938,11 +969,10 @@ export class MerchantWindow {
       // Cart-specific logging: avoid the race condition where each per-line
       // recordMerchantTransaction reads the same starting log + appends 1 +
       // writes back in parallel, leaving only the last entry persisted.
-      // Push to session log immediately, then batch-persist in ONE update.
+      // Post the checkout immediately, then batch-persist in ONE update.
       const when = Date.now();
-      for (const l of lines) {
-        this.transactions.push({ kind: "buy", name: l.item.name, qty: l.qty, cp: l.lineCp, when });
-      }
+      const checkoutEntries = lines.map(l => ({ kind: "buy", name: l.item.name, qty: l.qty, cp: l.lineCp, when }));
+      this._postTransactionLogEntries(checkoutEntries);
       // Skip persistent write when the GM relay handled it — gm-ops logs
       // each line server-side already.
       if (usedDirectPath) {
@@ -1078,6 +1108,11 @@ export class MerchantWindow {
       this._sanitizeRowQty(qtyInput);
       return;
     }
+    const serviceQtyInput = e.target.closest("[data-role=service-qty-input]");
+    if (serviceQtyInput) {
+      this._sanitizeServiceQty(serviceQtyInput);
+      return;
+    }
   }
 
   _sanitizeRowQty(input) {
@@ -1104,6 +1139,28 @@ export class MerchantWindow {
     if (!input) return 1;
     const v = Math.floor(Number(input.value)) || 1;
     return Math.max(1, v);
+  }
+
+  _coerceServiceQty(value) {
+    const max = 99;
+    let v = Math.floor(Number(value));
+    if (!Number.isFinite(v) || v < 1) v = 1;
+    return Math.max(1, Math.min(max, v));
+  }
+
+  _sanitizeServiceQty(input) {
+    input.value = String(this._coerceServiceQty(input.value));
+  }
+
+  _adjustServiceQty(serviceId, delta) {
+    const input = this.refs.itemList.querySelector(`[data-role=service-qty-input][data-service-id="${serviceId}"]`);
+    if (!input) return;
+    input.value = String(this._coerceServiceQty((Math.floor(Number(input.value)) || 1) + delta));
+  }
+
+  _readServiceQty(serviceId) {
+    const input = this.refs.itemList.querySelector(`[data-role=service-qty-input][data-service-id="${serviceId}"]`);
+    return this._coerceServiceQty(input?.value ?? 1);
   }
 
   _openCompareModal() {
@@ -1627,6 +1684,13 @@ export class MerchantWindow {
     const canBuy = !!this.viewer;
     const buyDisabled = canBuy ? "" : "disabled";
     const rarity = s.rarity ?? "common";
+    const qtyControl = canBuy ? `
+      <div class="pf2e-cd-mer-qty pf2e-cd-mer-service-qty" title="${escapeHTML(game.i18n.localize("PF2E_CINEMATIC_MERCHANT.qtyPrompt.howMany"))}">
+        <button type="button" class="pf2e-cd-mer-qty-btn" data-action="service-qty-minus" data-service-id="${s.id}" aria-label="-">-</button>
+        <input type="number" class="pf2e-cd-mer-qty-input" data-role="service-qty-input" data-service-id="${s.id}" min="1" max="99" step="1" value="1" />
+        <button type="button" class="pf2e-cd-mer-qty-btn" data-action="service-qty-plus" data-service-id="${s.id}" aria-label="+">+</button>
+      </div>
+    ` : "";
     const gmButtons = game.user.isGM ? `
       <button type="button" class="pf2e-cd-mer-edit-price" data-action="service-edit" data-service-id="${s.id}" title="${escapeHTML(game.i18n.localize("PF2E_CINEMATIC_MERCHANT.service.edit"))}"><i class="fa-solid fa-pen"></i></button>
       <button type="button" class="pf2e-cd-mer-delete" data-action="service-delete" data-service-id="${s.id}" title="${escapeHTML(game.i18n.localize("PF2E_CINEMATIC_MERCHANT.service.delete"))}"><i class="fa-solid fa-xmark"></i></button>
@@ -1648,6 +1712,7 @@ export class MerchantWindow {
         </div>
         <div class="pf2e-cd-mer-item-actions">
           ${gmButtons}
+          ${qtyControl}
           <button type="button" class="pf2e-cd-mer-buy" data-action="service-buy" data-service-id="${s.id}" ${buyDisabled}>
             <i class="fa-solid fa-handshake"></i> ${game.i18n.localize("PF2E_CINEMATIC_MERCHANT.service.pay")}
           </button>
@@ -1707,12 +1772,14 @@ export class MerchantWindow {
     }).catch(() => {});
   }
 
-  async _handleBuyService(serviceId) {
+  async _handleBuyService(serviceId, requestedQty = null) {
     if (!this.viewer || !this.actor) return;
     const services = getMerchantServices(this.actor);
     const s = services.find(x => x.id === serviceId);
     if (!s) return;
-    const priceCp = Math.max(0, Number(s.priceCp ?? 0) || 0);
+    const buyQty = requestedQty != null ? this._coerceServiceQty(requestedQty) : this._readServiceQty(serviceId);
+    const unitCp = Math.max(0, Number(s.priceCp ?? 0) || 0);
+    const priceCp = unitCp * buyQty;
     if (priceCp > 0) {
       const buyerCp = priceToCopper({ value: readActorCoins(this.viewer) });
       if (buyerCp < priceCp) {
@@ -1725,10 +1792,10 @@ export class MerchantWindow {
         await deductCoins(this.viewer, priceCp);
         await addCoins(this.actor, priceCp);
       }
-      this._logTransaction("buy", s.name, 1, priceCp, { img: s.img });
+      this._logTransaction("buy", s.name, buyQty, priceCp, { img: s.img, session: false, postChat: true });
       playBuy();
       this._showTransactionPopup({
-        kind: "buy", name: s.name, img: s.img, qty: 1, price: formatCopper(priceCp),
+        kind: "buy", name: s.name, img: s.img, qty: buyQty, price: formatCopper(priceCp),
       });
     } catch (err) {
       console.warn(`${MODULE_ID} | service purchase failed:`, err);
@@ -2742,7 +2809,7 @@ export class MerchantWindow {
       } else {
         throw new Error("no_permission_no_gm");
       }
-      this._logTransaction("buy", item.name, buyQty, totalCp, { img: item.img });
+      this._logTransaction("buy", item.name, buyQty, totalCp, { img: item.img, session: false, postChat: true });
       playBuy();
       this._showTransactionPopup({
         kind: "buy", name: item.name, img: item.img, qty: buyQty, price: formatCopper(totalCp),

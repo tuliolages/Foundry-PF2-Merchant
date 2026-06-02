@@ -2652,6 +2652,14 @@ dialog.pf2e-cd-mer-dialog input[type=checkbox]:checked::after,
   border-left-color: var(--pf2e-mer-gold);
   background: rgba(120, 90, 40, 0.06);
 }
+.pf2e-cd-mer-chat-qty {
+  display: inline-block;
+  margin-left: 3px;
+  padding: 0 5px;
+  border-radius: 999px;
+  background: rgba(120, 90, 40, 0.15);
+  font-weight: 700;
+}
 
 /* === Quantity selector (buy/sell row) === */
 .pf2e-cd-mer-qty {
@@ -3687,6 +3695,9 @@ dialog.pf2e-cd-mer-dialog select:focus {
 .pf2e-cd-mer-service-row { align-items: flex-start !important; cursor: pointer; }
 .pf2e-cd-mer-service-row .pf2e-cd-mer-item-img { margin-top: 2px; }
 .pf2e-cd-mer-service-row:hover { background: rgba(184, 146, 58, 0.08); }
+.pf2e-cd-mer-service-qty {
+  cursor: default;
+}
 .pf2e-cd-mer-service-desc {
   margin-top: 6px;
   padding-right: 4px;
