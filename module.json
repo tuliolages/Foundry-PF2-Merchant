@@ -31,7 +31,7 @@
   ],
   "relationships": {
     "systems": [
-      { "id": "pf2e", "type": "requires", "compatibility": { "minimum": "6.0.0" } }
+      { "id": "pf2e", "type": "system", "compatibility": { "minimum": "6.0.0" } }
     ]
   },
   "flags": {
